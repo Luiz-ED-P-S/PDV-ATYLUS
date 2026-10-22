@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PDV Atylus - Teste Interativo de Frente de Caixa</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- React & ReactDOM CDN -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <!-- Babel Standalone para JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            retail: {
+              dark: '#0a0f1d',
+              card: '#111827',
+              border: '#1f2937',
+              primary: '#10b981',
+              secondary: '#38bdf8',
+              accent: '#f59e0b',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @media print {
+      body * { visibility: hidden; }
+      #printable-receipt, #printable-receipt * { visibility: visible; }
+      #printable-receipt {
+        position: absolute; left: 0; top: 0; width: 80mm;
+        margin: 0; padding: 0; background: white !important; color: black !important;
+      }
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 select-none overflow-hidden font-sans">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // --- SINTETIZADOR WEB AUDIO API ---
+    class SoundManager {
+      constructor() {
+        this.ctx = null;
+        this.muted = false;
+      }
+      getCtx() {
+        if (!this.ctx && window.AudioContext) this.ctx = new AudioContext();
+        if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+        return this.ctx;
+      }
+      playScan() {
+        if (this.muted) return;
+        const ctx = this.getCtx();
+        if (!ctx) return;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1750, ctx.currentTime);
+        gain.gain.setValueAtTime(0.15, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.08);
+      }
+      playError() {
+        if (this.muted) return;
+        const ctx = this.getCtx();
+        if (!ctx) return;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(220, ctx.currentTime);
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.25);
+      }
+      playChime() {
+        if (this.muted) return;
+        const ctx = this.getCtx();
+        if (!ctx) return;
+        [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          const t = ctx.currentTime + idx * 0.06;
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, t);
+          gain.gain.setValueAtTime(0.12, t);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(t);
+          osc.stop(t + 0.3);
+        });
+      }
+    }
+    const sound = new SoundManager();
+
+    // --- CATÁLOGO DE PRODUTOS DEMO ---
+    const PRODUTOS_DEMO = [
+      { id: '1', codigoBarras: '7894900010015', nome: 'Refrigerante Coca-Cola 2L', preco: 9.50, estoque: 50 },
+      { id: '2', codigoBarras: '7891000100103', nome: 'Leite Integral Ninho 1L', preco: 5.80, estoque: 30 },
+      { id: '3', codigoBarras: '7891910000197', nome: 'Açúcar Refinado União 1kg', preco: 4.20, estoque: 40 },
+      { id: '4', codigoBarras: '7896004000153', nome: 'Café Torrado e Moído Pilão 500g', preco: 18.90, estoque: 25 },
+      { id: '5', codigoBarras: '7891024131238', nome: 'Biscoito Recheado Passatempo 130g', preco: 3.20, estoque: 60 },
+    ];
+
+    function App() {
+      // Estado de Caixa
+      const [caixaAberto, setCaixaAberto] = useState(true);
+      const [saldoInicial, setSaldoInicial] = useState(100.00);
+      const [movimentacoes, setMovimentacoes] = useState([
+        { id: 1, tipo: 'Suprimento', valor: 100.00, motivo: 'Fundo inicial de troco', data: new Date().toLocaleTimeString() }
+      ]);
+
+      // Estado do Carrinho
+      const [itens, setItens] = useState([
+        { id: 'item-1', produtoId: '1', codigoBarras: '7894900010015', nome: 'Refrigerante Coca-Cola 2L', preco: 9.50, qtd: 2, subtotal: 19.00 },
+        { id: 'item-2', produtoId: '4', codigoBarras: '7896004000153', nome: 'Café Torrado e Moído Pilão 500g', preco: 18.90, qtd: 1, subtotal: 18.90 }
+      ]);
+      const [selectedId, setSelectedId] = useState('item-1');
+      const [desconto, setDesconto] = useState(0);
+      const [codigoInput, setCodigoInput] = useState('');
+      const [erroMsg, setErroMsg] = useState(null);
+      const [isMuted, setIsMuted] = useState(false);
+
+      // Modais
+      const [modalPagamento, setModalPagamento] = useState(false);
+      const [modalBusca, setModalBusca] = useState(false);
+      const [modalCaixa, setModalCaixa] = useState(false);
+      const [modalImportador, setModalImportador] = useState(false);
+      const [vendaConcluida, setVendaConcluida] = useState(null);
+
+      const barcodeInputRef = useRef(null);
+
+      // Foco automático
+      useEffect(() => {
+        if (!modalPagamento && !modalBusca && !modalCaixa && !modalImportador && !vendaConcluida) {
+          barcodeInputRef.current?.focus();
+        }
+      }, [modalPagamento, modalBusca, modalCaixa, modalImportador, vendaConcluida]);
+
+      // Atalhos Globais F1-F4, Del, +, -, Esc
+      useEffect(() => {
+        const onKeyDown = (e) => {
+          if (modalPagamento || modalBusca || modalCaixa || modalImportador || vendaConcluida) {
+            if (e.key === 'Escape') {
+              setModalPagamento(false);
+              setModalBusca(false);
+              setModalCaixa(false);
+              setModalImportador(false);
+              setVendaConcluida(null);
+            }
+            return;
+          }
+
+          if (e.key === 'F1') {
+            e.preventDefault();
+            if (itens.length > 0 && caixaAberto) setModalPagamento(true);
+            else { sound.playError(); setErroMsg('Caixa fechado ou carrinho vazio.'); }
+          } else if (e.key === 'F2') {
+            e.preventDefault();
+            setModalBusca(true);
+          } else if (e.key === 'F3') {
+            e.preventDefault();
+            setModalCaixa(true);
+          } else if (e.key === 'F4') {
+            e.preventDefault();
+            setModalImportador(true);
+          } else if (e.key === 'Delete') {
+            e.preventDefault();
+            removerItem(selectedId);
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            if (itens.length > 0 && confirm('Deseja cancelar a venda atual?')) {
+              setItens([]);
+            }
+          }
+        };
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+      }, [modalPagamento, modalBusca, modalCaixa, modalImportador, vendaConcluida, itens, caixaAberto, selectedId]);
+
+      // Adicionar produto ao carrinho
+      const adicionarAoCarrinho = (produto, quantidade = 1) => {
+        sound.playScan();
+        setErroMsg(null);
+        setItens(prev => {
+          const ex = prev.find(i => i.produtoId === produto.id);
+          if (ex) {
+            const nQtd = ex.qtd + quantidade;
+            return prev.map(i => i.produtoId === produto.id ? { ...i, qtd: nQtd, subtotal: nQtd * i.preco } : i);
+          }
+          const novo = {
+            id: 'item-' + Date.now(),
+            produtoId: produto.id,
+            codigoBarras: produto.codigoBarras,
+            nome: produto.nome,
+            preco: produto.preco,
+            qtd: quantidade,
+            subtotal: quantidade * produto.preco
+          };
+          setSelectedId(novo.id);
+          return [...prev, novo];
+        });
+      };
+
+      const alterarQtd = (id, delta) => {
+        setItens(prev => prev.map(i => {
+          if (i.id === id) {
+            const n = Math.max(1, i.qtd + delta);
+            return { ...i, qtd: n, subtotal: n * i.preco };
+          }
+          return i;
+        }));
+      };
+
+      const removerItem = (id) => {
+        setItens(prev => {
+          const f = prev.filter(i => i.id !== id);
+          if (f.length > 0) setSelectedId(f[f.length - 1].id);
+          return f;
+        });
+      };
+
+      // Processar Leitor de Código de Barras
+      const handleBarcodeSubmit = (e) => {
+        e.preventDefault();
+        const entrada = codigoInput.trim();
+        if (!entrada) return;
+
+        if (!caixaAberto) {
+          sound.playError();
+          setErroMsg('Caixa fechado! Abra o caixa [F3] antes de bipar itens.');
+          return;
+        }
+
+        let qtd = 1;
+        let cod = entrada;
+        if (entrada.includes('*')) {
+          const p = entrada.split('*');
+          const q = parseFloat(p[0]);
+          if (!isNaN(q) && q > 0) { qtd = q; cod = p[1].trim(); }
+        }
+
+        const prod = PRODUTOS_DEMO.find(p => p.codigoBarras === cod);
+        if (prod) {
+          adicionarAoCarrinho(prod, qtd);
+          setCodigoInput('');
+        } else {
+          sound.playError();
+          setErroMsg(`Produto com código '${cod}' não localizado.`);
+        }
+      };
+
+      const totalBruto = itens.reduce((acc, i) => acc + i.subtotal, 0);
+      const totalLiquido = Math.max(0, totalBruto - desconto);
+      const totalItens = itens.reduce((acc, i) => acc + i.qtd, 0);
+
+      return (
+        <div className="flex flex-col h-screen overflow-hidden">
+          {/* HEADER */}
+          <header className="h-14 bg-slate-900 border-b border-slate-800 px-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="w-3.5 h-3.5 rounded-full bg-emerald-500 shadow-md shadow-emerald-500/50"></span>
+              <span className="font-black text-lg text-white font-mono tracking-wider">PDV ATYLUS</span>
+              <button
+                onClick={() => setModalCaixa(true)}
+                className={`px-3 py-1 rounded-full text-xs font-mono font-bold border transition ${
+                  caixaAberto ? 'bg-emerald-950/60 text-emerald-400 border-emerald-800' : 'bg-red-950/60 text-red-400 border-red-800'
+                }`}
+              >
+                CAIXA {caixaAberto ? 'ABERTO' : 'FECHADO'} (F3)
+              </button>
+            </div>
+
+            <div className="flex items-center gap-4 text-xs font-mono text-slate-400">
+              <span>Operador: <strong className="text-slate-200">Luiz Portella</strong> (OP01)</span>
+              <button
+                onClick={() => { sound.muted = !sound.muted; setIsMuted(sound.muted); }}
+                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold"
+              >
+                {isMuted ? '🔇 Mudo' : '🔊 Som Ativo'}
+              </button>
+            </div>
+          </header>
+
+          {/* ÁREA DE VENDA */}
+          <div className="flex-1 flex p-3 gap-3 overflow-hidden">
+            {/* LADO ESQUERDO: Bipador e Carrinho */}
+            <div className="flex-[2] flex flex-col gap-3 min-w-0">
+              {/* INPUT LEITOR */}
+              <form onSubmit={handleBarcodeSubmit} className="relative">
+                <input
+                  ref={barcodeInputRef}
+                  type="text"
+                  placeholder="Passe o leitor ou digite Qtd*Código (Ex: 3*7894900010015)..."
+                  value={codigoInput}
+                  onChange={e => setCodigoInput(e.target.value)}
+                  className="w-full pl-4 pr-24 py-3.5 bg-slate-900 border-2 border-slate-700 rounded-2xl text-xl font-mono font-bold text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 shadow-lg tracking-wider"
+                />
+                <button type="submit" className="absolute right-2 top-2 px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-mono font-bold text-sm">
+                  Enter
+                </button>
+                {erroMsg && (
+                  <div className="mt-1 text-red-400 text-xs font-mono bg-red-950/80 p-2 rounded-lg border border-red-800">
+                    ⚠️ {erroMsg}
+                  </div>
+                )}
+              </form>
+
+              {/* TABELA DE ITENS */}
+              <div className="flex-1 bg-slate-900/80 rounded-2xl border border-slate-800 flex flex-col overflow-hidden shadow-inner">
+                {itens.length === 0 ? (
+                  <div className="flex-1 flex flex-col items-center justify-center text-slate-500 p-8">
+                    <span className="text-4xl mb-2">🛒</span>
+                    <h3 className="text-xl font-bold text-slate-400">Carrinho Vazio</h3>
+                    <p className="text-sm mt-1">Bipe um item ou aperte <kbd className="px-2 py-0.5 bg-slate-800 text-emerald-400 rounded">F2</kbd> para pesquisar.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-y-auto flex-1">
+                    <table className="w-full text-left text-sm border-collapse font-mono">
+                      <thead className="bg-slate-800 text-slate-400 text-xs uppercase sticky top-0">
+                        <tr>
+                          <th className="p-3 text-center w-12">#</th>
+                          <th className="p-3 w-36">Código</th>
+                          <th className="p-3 font-sans">Descrição</th>
+                          <th className="p-3 text-right w-24">Unitário</th>
+                          <th className="p-3 text-center w-28">Qtd</th>
+                          <th className="p-3 text-right w-28">Subtotal</th>
+                          <th className="p-3 text-center w-12">X</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800">
+                        {itens.map((i, idx) => (
+                          <tr
+                            key={i.id}
+                            onClick={() => setSelectedId(i.id)}
+                            className={`cursor-pointer transition ${i.id === selectedId ? 'bg-emerald-950/40 text-white border-l-4 border-emerald-500' : 'hover:bg-slate-800/40 text-slate-300'}`}
+                          >
+                            <td className="p-3 text-center text-xs text-slate-500">{String(idx + 1).padStart(2, '0')}</td>
+                            <td className="p-3 text-xs text-slate-400">{i.codigoBarras}</td>
+                            <td className="p-3 font-sans font-medium text-slate-200">{i.nome}</td>
+                            <td className="p-3 text-right">R$ {i.preco.toFixed(2)}</td>
+                            <td className="p-3 text-center">
+                              <div className="flex items-center justify-center gap-1.5" onClick={e => e.stopPropagation()}>
+                                <button onClick={() => alterarQtd(i.id, -1)} className="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 font-bold">-</button>
+                                <span className="w-8 text-center font-bold text-white">{i.qtd}</span>
+                                <button onClick={() => alterarQtd(i.id, 1)} className="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 font-bold">+</button>
+                              </div>
+                            </td>
+                            <td className="p-3 text-right font-bold text-emerald-400 text-base">R$ {i.subtotal.toFixed(2)}</td>
+                            <td className="p-3 text-center" onClick={e => e.stopPropagation()}>
+                              <button onClick={() => removerItem(i.id)} className="text-slate-500 hover:text-red-400">🗑️</button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* LADO DIREITO: Painel Digital e Botões */}
+            <div className="flex-1 flex flex-col gap-3 min-w-[320px] max-w-[420px]">
+              {/* DISPLAY FINANCEIRO */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-2xl font-mono">
+                <div className="space-y-2 text-sm text-slate-400">
+                  <div className="flex justify-between">
+                    <span>SUBTOTAL:</span>
+                    <span className="font-bold text-slate-200">R$ {totalBruto.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>DESCONTO:</span>
+                    <span className="font-bold text-red-400">- R$ {desconto.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-slate-500 pt-1 border-t border-slate-800">
+                    <span>TOTAL DE ITENS:</span>
+                    <span>{totalItens} un</span>
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-3 border-t-2 border-dashed border-slate-800 text-right">
+                  <span className="text-xs text-emerald-400 font-bold uppercase tracking-wider block">VALOR LÍQUIDO</span>
+                  <div className="text-5xl font-black text-emerald-400 tracking-tight mt-1">
+                    R$ {totalLiquido.toFixed(2)}
+                  </div>
+                </div>
+              </div>
+
+              {/* BOTÕES DE ATALHO */}
+              <div className="flex-1 bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between gap-2 font-mono">
+                <div className="space-y-2">
+                  <button
+                    onClick={() => {
+                      if (itens.length > 0 && caixaAberto) setModalPagamento(true);
+                      else { sound.playError(); setErroMsg('Caixa fechado ou carrinho vazio.'); }
+                    }}
+                    disabled={itens.length === 0}
+                    className="w-full py-4 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-slate-950 font-black text-base flex justify-between items-center shadow-lg shadow-emerald-500/20 transition active:scale-95"
+                  >
+                    <span>✅ FINALIZAR VENDA</span>
+                    <kbd className="px-2 py-0.5 rounded bg-emerald-600/70 text-slate-950 text-xs">F1</kbd>
+                  </button>
+
+                  <button
+                    onClick={() => setModalBusca(true)}
+                    className="w-full py-3 px-4 rounded-xl bg-sky-950/60 hover:bg-sky-900/70 border border-sky-800/60 text-sky-200 font-bold text-sm flex justify-between items-center"
+                  >
+                    <span>🔍 BUSCAR PRODUTO</span>
+                    <kbd className="px-2 py-0.5 rounded bg-sky-900 text-sky-300 text-xs">F2</kbd>
+                  </button>
+
+                  <button
+                    onClick={() => setModalCaixa(true)}
+                    className="w-full py-3 px-4 rounded-xl bg-amber-950/60 hover:bg-amber-900/70 border border-amber-800/60 text-amber-200 font-bold text-sm flex justify-between items-center"
+                  >
+                    <span>🔒 CONTROLE DE CAIXA</span>
+                    <kbd className="px-2 py-0.5 rounded bg-amber-900 text-amber-300 text-xs">F3</kbd>
+                  </button>
+
+                  <button
+                    onClick={() => setModalImportador(true)}
+                    className="w-full py-3 px-4 rounded-xl bg-indigo-950/60 hover:bg-indigo-900/70 border border-indigo-800/60 text-indigo-200 font-bold text-sm flex justify-between items-center"
+                  >
+                    <span>📊 IMPORTADOR PLANILHA IA</span>
+                    <kbd className="px-2 py-0.5 rounded bg-indigo-900 text-indigo-300 text-xs">F4</kbd>
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => { if (itens.length > 0 && confirm('Cancelar venda?')) setItens([]); }}
+                  className="w-full py-2.5 px-3 rounded-xl bg-slate-800/60 hover:bg-red-950/50 hover:text-red-400 border border-slate-700/60 text-slate-400 text-xs font-bold flex justify-between items-center"
+                >
+                  <span>🔄 CANCELAR VENDA</span>
+                  <kbd className="px-1.5 py-0.5 rounded bg-slate-700 text-slate-300 text-[10px]">Esc</kbd>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* MODAL PAGAMENTO (F1) */}
+          {modalPagamento && (
+            <ModalPagamentoComponent
+              total={totalLiquido}
+              onClose={() => setModalPagamento(false)}
+              onSucesso={(pagamentoData) => {
+                sound.playChime();
+                const venda = {
+                  id: 'VND-' + Date.now().toString().slice(-6),
+                  dataVenda: new Date().toISOString(),
+                  operador: 'Luiz Portella',
+                  itens: [...itens],
+                  subtotal: totalBruto,
+                  desconto,
+                  total: totalLiquido,
+                  pagamento: pagamentoData
+                };
+                setItens([]);
+                setModalPagamento(false);
+                setVendaConcluida(venda);
+              }}
+            />
+          )}
+
+          {/* MODAL BUSCA (F2) */}
+          {modalBusca && (
+            <ModalBuscaComponent
+              produtos={PRODUTOS_DEMO}
+              onClose={() => setModalBusca(false)}
+              onSelecionar={p => {
+                adicionarAoCarrinho(p, 1);
+                setModalBusca(false);
+              }}
+            />
+          )}
+
+          {/* MODAL CAIXA (F3) */}
+          {modalCaixa && (
+            <ModalCaixaComponent
+              caixaAberto={caixaAberto}
+              saldoInicial={saldoInicial}
+              movimentacoes={movimentacoes}
+              onAbrir={saldo => {
+                setSaldoInicial(saldo);
+                setCaixaAberto(true);
+                setMovimentacoes([{ id: Date.now(), tipo: 'Suprimento', valor: saldo, motivo: 'Abertura de Caixa', data: new Date().toLocaleTimeString() }]);
+                setModalCaixa(false);
+              }}
+              onMovimentacao={(tipo, val, mot) => {
+                setMovimentacoes(prev => [...prev, { id: Date.now(), tipo, valor: val, motivo: mot, data: new Date().toLocaleTimeString() }]);
+              }}
+              onFecharCego={saldoContado => {
+                setCaixaAberto(false);
+                setModalCaixa(false);
+                alert(`Caixa Fechado com Sucesso! Valor Informado: R$ ${saldoContado.toFixed(2)}. Backup SQLite compactado.`);
+              }}
+              onClose={() => setModalCaixa(false)}
+            />
+          )}
+
+          {/* MODAL IMPORTADOR IA (F4) */}
+          {modalImportador && (
+            <ModalImportadorComponent
+              onClose={() => setModalImportador(false)}
+              onImportarNovosProdutos={novos => {
+                novos.forEach(p => PRODUTOS_DEMO.push(p));
+                setModalImportador(false);
+                alert(`${novos.length} produtos importados para o catálogo local!`);
+              }}
+            />
+          )}
+
+          {/* MODAL CUPOM TÉRMICO */}
+          {vendaConcluida && (
+            <ModalCupomComponent
+              venda={vendaConcluida}
+              onClose={() => setVendaConcluida(null)}
+            />
+          )}
+        </div>
+      );
+    }
+
+    // --- SUB-COMPONENTES MODAIS ---
+
+    function ModalPagamentoComponent({ total, onClose, onSucesso }) {
+      const [forma, setForma] = useState('Dinheiro');
+      const [recebido, setRecebido] = useState(total);
+      const [pixSimulado, setPixSimulado] = useState(false);
+
+      const troco = Math.max(0, recebido - total);
+
+      return (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl bg-slate-900 border border-slate-700 rounded-3xl overflow-hidden shadow-2xl flex flex-col font-sans">
+            <div className="p-4 bg-slate-800/80 border-b border-slate-700 flex justify-between items-center">
+              <h3 className="font-bold text-white text-lg">💰 Pagamento (F1) - Total: R$ {total.toFixed(2)}</h3>
+              <button onClick={onClose} className="text-slate-400 hover:text-white font-mono text-xl">✕</button>
+            </div>
+
+            <div className="grid grid-cols-4 p-4 gap-2 bg-slate-950/60 font-mono text-xs">
+              {['Dinheiro', 'Pix', 'CartaoCredito', 'CartaoDebito'].map(f => (
+                <button
+                  key={f}
+                  onClick={() => setForma(f)}
+                  className={`py-3 rounded-xl font-bold border transition ${forma === f ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-slate-800 text-slate-400 border-slate-700'}`}
+                >
+                  {f === 'CartaoCredito' ? '💳 Crédito' : f === 'CartaoDebito' ? '💳 Débito' : f === 'Pix' ? '⚡ Pix' : '💵 Dinheiro'}
+                </button>
+              ))}
+            </div>
+
+            <div className="p-6">
+              {forma === 'Dinheiro' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-mono text-slate-400">VALOR RECEBIDO (R$):</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={recebido}
+                        onChange={e => setRecebido(parseFloat(e.target.value) || 0)}
+                        className="w-full p-3 bg-slate-950 border border-slate-700 rounded-xl text-2xl font-bold text-white font-mono mt-1"
+                      />
+                    </div>
+                    <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex flex-col justify-center">
+                      <span className="text-xs font-mono text-slate-400">TROCO:</span>
+                      <span className={`text-3xl font-extrabold font-mono mt-1 ${troco > 0 ? 'text-amber-400' : 'text-slate-400'}`}>
+                        R$ {troco.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    {[10, 20, 50, 100].map(val => (
+                      <button
+                        key={val}
+                        onClick={() => setRecebido(val >= total ? val : recebido + val)}
+                        className="px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded text-xs font-mono text-slate-300"
+                      >
+                        + R$ {val}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {forma === 'Pix' && (
+                <div className="text-center space-y-3">
+                  <div className="inline-block p-4 bg-white rounded-2xl">
+                    <svg viewBox="0 0 200 200" width="160" height="160">
+                      <rect width="200" height="200" fill="white"/>
+                      <rect x="20" y="20" width="40" height="40" fill="black"/>
+                      <rect x="25" y="25" width="30" height="30" fill="white"/>
+                      <rect x="30" y="30" width="20" height="20" fill="black"/>
+                      <rect x="140" y="20" width="40" height="40" fill="black"/>
+                      <rect x="145" y="25" width="30" height="30" fill="white"/>
+                      <rect x="150" y="30" width="20" height="20" fill="black"/>
+                      <rect x="20" y="140" width="40" height="40" fill="black"/>
+                      <rect x="25" y="145" width="30" height="30" fill="white"/>
+                      <rect x="30" y="150" width="20" height="20" fill="black"/>
+                      <rect x="85" y="85" width="30" height="30" fill="#00bdae"/>
+                      <text x="100" y="185" font-size="10" text-anchor="middle">R$ {total.toFixed(2)}</text>
+                    </svg>
+                  </div>
+                  <p className="text-xs text-slate-400 font-mono">Aguardando confirmação bancária do Pix...</p>
+                  <button
+                    onClick={() => { setPixSimulado(true); onSucesso({ forma: 'Pix', valor: total, troco: 0 }); }}
+                    className="px-4 py-2 bg-sky-950 hover:bg-sky-900 border border-sky-800 text-sky-300 rounded-xl text-xs font-mono font-bold"
+                  >
+                    ⚡ Simular Pagamento Pix Instantâneo
+                  </button>
+                </div>
+              )}
+
+              {(forma === 'CartaoCredito' || forma === 'CartaoDebito') && (
+                <div className="text-center py-8 text-slate-400">
+                  <p className="text-base font-bold text-slate-200">Aproxime ou insira o cartão na máquina POS</p>
+                  <p className="text-xs mt-1">Aguarde aprovação e clique em confirmar.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 bg-slate-950 border-t border-slate-800 flex justify-between">
+              <button onClick={onClose} className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-sm font-mono">[Esc] Cancelar</button>
+              <button
+                disabled={forma === 'Dinheiro' && recebido < total}
+                onClick={() => onSucesso({ forma, valor: forma === 'Dinheiro' ? recebido : total, troco: forma === 'Dinheiro' ? troco : 0 })}
+                className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-slate-950 font-bold rounded-xl text-sm font-mono"
+              >
+                Confirmar Venda (Enter)
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function ModalBuscaComponent({ produtos, onClose, onSelecionar }) {
+      const [termo, setTermo] = useState('');
+      const filtrados = produtos.filter(p => p.nome.toLowerCase().includes(termo.toLowerCase()) || p.codigoBarras.includes(termo));
+
+      return (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-xl bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl flex flex-col font-sans max-h-[80vh]">
+            <div className="p-4 bg-slate-800 border-b border-slate-700 flex justify-between items-center">
+              <h3 className="font-bold text-white">🔍 Buscar Produtos (F2)</h3>
+              <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
+            </div>
+            <div className="p-4 border-b border-slate-800">
+              <input
+                autoFocus
+                type="text"
+                placeholder="Digite o nome ou código..."
+                value={termo}
+                onChange={e => setTermo(e.target.value)}
+                className="w-full p-3 bg-slate-950 border border-slate-700 rounded-xl text-white font-mono"
+              />
+            </div>
+            <div className="flex-1 overflow-y-auto divide-y divide-slate-800 p-2">
+              {filtrados.map(p => (
+                <div
+                  key={p.id}
+                  onClick={() => onSelecionar(p)}
+                  className="p-3 hover:bg-slate-800 rounded-xl cursor-pointer flex justify-between items-center"
+                >
+                  <div>
+                    <span className="font-bold text-slate-200">{p.nome}</span>
+                    <span className="block text-xs text-slate-500 font-mono">{p.codigoBarras} • Estoque: {p.estoque} un</span>
+                  </div>
+                  <span className="text-emerald-400 font-bold font-mono">R$ {p.preco.toFixed(2)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function ModalCaixaComponent({ caixaAberto, saldoInicial, movimentacoes, onAbrir, onMovimentacao, onFecharCego, onClose }) {
+      const [aba, setAba] = useState(caixaAberto ? 'mov' : 'abrir');
+      const [novoSaldo, setNovoSaldo] = useState(100);
+      const [tipo, setTipo] = useState('Sangria');
+      const [val, setVal] = useState(50);
+      const [mot, setMot] = useState('');
+      const [contado, setContado] = useState(0);
+
+      return (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl flex flex-col font-sans">
+            <div className="p-4 bg-slate-800 border-b border-slate-700 flex justify-between items-center">
+              <h3 className="font-bold text-white">🔒 Gestão de Caixa (F3)</h3>
+              <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
+            </div>
+
+            <div className="p-6 space-y-4 font-mono text-sm">
+              {caixaAberto ? (
+                <>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <button onClick={() => setAba('mov')} className={`p-2 rounded font-bold ${aba === 'mov' ? 'bg-sky-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Sangria / Suprimento</button>
+                    <button onClick={() => setAba('fechar')} className={`p-2 rounded font-bold ${aba === 'fechar' ? 'bg-amber-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Fechamento Cego</button>
+                  </div>
+
+                  {aba === 'mov' && (
+                    <div className="space-y-3 pt-2">
+                      <div className="flex gap-2">
+                        <button onClick={() => setTipo('Sangria')} className={`flex-1 p-2 rounded text-xs font-bold ${tipo === 'Sangria' ? 'bg-amber-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Retirada (Sangria)</button>
+                        <button onClick={() => setTipo('Suprimento')} className={`flex-1 p-2 rounded text-xs font-bold ${tipo === 'Suprimento' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Entrada (Suprimento)</button>
+                      </div>
+                      <input type="number" value={val} onChange={e => setVal(parseFloat(e.target.value) || 0)} className="w-full p-2 bg-slate-950 border border-slate-700 rounded text-white" placeholder="Valor" />
+                      <input type="text" value={mot} onChange={e => setMot(e.target.value)} className="w-full p-2 bg-slate-950 border border-slate-700 rounded text-white" placeholder="Motivo" />
+                      <button onClick={() => { onMovimentacao(tipo, val, mot); setMot(''); alert('Movimentação registrada!'); }} className="w-full p-2.5 bg-sky-500 font-bold text-slate-950 rounded">Registrar Movimentação</button>
+                    </div>
+                  )}
+
+                  {aba === 'fechar' && (
+                    <div className="space-y-3 pt-2">
+                      <p className="text-xs text-amber-300">Digite o valor contado na gaveta para auditoria cega:</p>
+                      <input type="number" value={contado} onChange={e => setContado(parseFloat(e.target.value) || 0)} className="w-full p-3 bg-slate-950 border border-slate-700 rounded text-xl font-bold text-white" />
+                      <button onClick={() => onFecharCego(contado)} className="w-full p-3 bg-amber-500 font-bold text-slate-950 rounded">Conferir e Fechar Caixa</button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-xs text-slate-400">O caixa está fechado. Informe o fundo de troco inicial:</p>
+                  <input type="number" value={novoSaldo} onChange={e => setNovoSaldo(parseFloat(e.target.value) || 0)} className="w-full p-3 bg-slate-950 border border-slate-700 rounded text-xl font-bold text-white" />
+                  <button onClick={() => onAbrir(novoSaldo)} className="w-full p-3 bg-emerald-500 font-bold text-slate-950 rounded">Confirmar Abertura de Caixa</button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function ModalImportadorComponent({ onClose, onImportarNovosProdutos }) {
+      return (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-xl bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl p-6 font-sans space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <h3 className="font-bold text-white">📊 Importador Inteligente por IA (F4)</h3>
+              <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
+            </div>
+            <p className="text-xs text-slate-400">A IA lê os cabeçalhos de planilhas Excel/CSV e detecta automaticamente código de barras, descrição, preço de venda e estoque.</p>
+
+            <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl space-y-2 font-mono text-xs text-slate-300">
+              <div className="text-emerald-400 font-bold">✨ Mapeamento Sugerido pela IA (Gemini):</div>
+              <div>• Código de Barras ➔ coluna 'codigo_barras' (100% confiança)</div>
+              <div>• Nome do Produto ➔ coluna 'descricao_item' (98% confiança)</div>
+              <div>• Preço de Venda ➔ coluna 'preco_unitario' (95% confiança)</div>
+            </div>
+
+            <button
+              onClick={() => {
+                onImportarNovosProdutos([
+                  { id: '10', codigoBarras: '7891000200000', nome: 'Achocolatado Nescau 400g', preco: 8.90, estoque: 45 },
+                  { id: '11', codigoBarras: '7892000300000', nome: 'Detergente Ypê Neutro 500ml', preco: 2.50, estoque: 100 }
+                ]);
+              }}
+              className="w-full p-3 bg-indigo-600 hover:bg-indigo-500 font-bold text-white rounded-xl font-mono text-sm"
+            >
+              Confirmar Importação de 2 Produtos de Teste
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    function ModalCupomComponent({ venda, onClose }) {
+      return (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl flex flex-col font-sans">
+            <div className="p-3 bg-slate-800 flex justify-between items-center text-xs font-bold text-white">
+              <span>🧾 Cupom Não-Fiscal</span>
+              <button onClick={onClose}>✕</button>
+            </div>
+
+            <div className="p-4 bg-slate-950 flex justify-center">
+              <div id="printable-receipt" className="w-[80mm] bg-amber-50 text-slate-900 p-4 font-mono text-xs select-text border border-slate-300">
+                <div className="text-center border-b border-dashed border-slate-400 pb-2 mb-2">
+                  <div className="font-bold text-sm">PDV ATYLUS COMERCIAL</div>
+                  <div className="text-[10px] text-slate-600">Rua do Comércio, 1000 - Centro</div>
+                  <div className="text-[10px] font-bold mt-1">*** CUPOM NÃO FISCAL ***</div>
+                </div>
+
+                <div className="text-[10px] border-b border-dashed border-slate-400 pb-2 mb-2">
+                  <div>Venda: #{venda.id}</div>
+                  <div>Data: {new Date().toLocaleString()}</div>
+                  <div>Operador: {venda.operador}</div>
+                </div>
+
+                <div className="border-b border-dashed border-slate-400 pb-2 mb-2 text-[10px]">
+                  {venda.itens.map((it, idx) => (
+                    <div key={idx} className="flex justify-between my-0.5">
+                      <span>{it.qtd}x {it.nome.slice(0, 18)}</span>
+                      <span>R$ {it.subtotal.toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="border-b border-dashed border-slate-400 pb-2 mb-2 text-xs">
+                  <div className="flex justify-between font-bold text-sm">
+                    <span>TOTAL:</span>
+                    <span>R$ {venda.total.toFixed(2)}</span>
+                  </div>
+                  <div className="text-[10px] mt-1 flex justify-between">
+                    <span>FORMA: {venda.pagamento.forma}</span>
+                    <span>R$ {venda.pagamento.valor.toFixed(2)}</span>
+                  </div>
+                  {venda.pagamento.troco > 0 && (
+                    <div className="text-[10px] flex justify-between font-bold">
+                      <span>TROCO:</span>
+                      <span>R$ {venda.pagamento.troco.toFixed(2)}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="text-center text-[10px] text-slate-600 pt-1">
+                  <div>Obrigado pela preferência!</div>
+                  <div className="font-mono text-[9px] mt-1">|||||||||||||||||||||||||||||||||</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-900 border-t border-slate-800 flex justify-between text-xs font-mono">
+              <button onClick={onClose} className="px-3 py-1.5 bg-slate-800 text-slate-300 rounded">[Esc] Fechar</button>
+              <button onClick={() => window.print()} className="px-4 py-1.5 bg-emerald-500 font-bold text-slate-950 rounded">Imprimir Cupom</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
