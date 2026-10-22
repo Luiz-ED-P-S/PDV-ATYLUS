@@ -59,7 +59,7 @@ export const POSView: React.FC<POSViewProps> = ({ onAbrirImportador }) => {
     adicionarProduto,
     removerItemSelecionado,
     incrementarQuantidade,
-    selectedItemId,
+    getSelectedItemId,
     setDesconto,
     limparCarrinhoAbaAtual,
   } = useCartStore();
@@ -67,6 +67,7 @@ export const POSView: React.FC<POSViewProps> = ({ onAbrirImportador }) => {
   const abaAtiva = getAbaAtiva();
   const itens = getItens();
   const desconto = getDesconto();
+  const selectedItemId = getSelectedItemId();
 
   const { caixa, carregarCaixa } = useCashierStore();
   const operador = useAuthStore(state => state.operador);

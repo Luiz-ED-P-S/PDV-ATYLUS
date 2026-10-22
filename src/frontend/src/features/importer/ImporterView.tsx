@@ -12,7 +12,6 @@ export const ImporterView: React.FC<ImporterViewProps> = ({ onVoltarParaPdv }) =
   // Estados de Planilha IA
   const [arquivoNome, setArquivoNome] = useState<string>('');
   const [cabecalhos, setCabecalhos] = useState<string[]>([]);
-  const [linhasAmostra, setLinhasAmostra] = useState<string[][]>([]);
   const [mapeamento, setMapeamento] = useState<MapeamentoColunas | null>(null);
   const [analisando, setAnalisando] = useState(false);
   const [colCodigo, setColCodigo] = useState('');
@@ -92,7 +91,6 @@ export const ImporterView: React.FC<ImporterViewProps> = ({ onVoltarParaPdv }) =
     const rows = linhas.slice(1, 4).map(l => l.split(sep).map(c => c.trim().replace(/^["']|["']$/g, '')));
 
     setCabecalhos(headers);
-    setLinhasAmostra(rows);
     analisarComIa(nome, headers, rows);
   };
 

@@ -82,14 +82,43 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors("AllowLocalhost");
 
-// Suporte para servir a SPA React compilada a partir de wwwroot
-app.UseDefaultFiles();
-app.UseStaticFiles();
+// Suporte para servir a SPA React compilada a partir de wwwroot (com detecção flexível de caminho)
+var wwwrootDir = Path.Combine(AppContext.BaseDirectory, "wwwroot");
+if (!Directory.Exists(wwwrootDir))
+{
+    var altPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../wwwroot"));
+    if (Directory.Exists(altPath)) wwwrootDir = altPath;
+    else
+    {
+        var localPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+        if (Directory.Exists(localPath)) wwwrootDir = localPath;
+    }
+}
+
+if (Directory.Exists(wwwrootDir))
+{
+    var physicalProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(wwwrootDir);
+    app.UseDefaultFiles(new DefaultFilesOptions { FileProvider = physicalProvider });
+    app.UseStaticFiles(new StaticFileOptions { FileProvider = physicalProvider });
+}
+else
+{
+    app.UseDefaultFiles();
+    app.UseStaticFiles();
+}
 
 app.UseAuthorization();
 app.MapControllers();
 
 // Fallback para SPA React (roteamento no cliente)
-app.MapFallbackToFile("index.html");
+if (Directory.Exists(wwwrootDir) && File.Exists(Path.Combine(wwwrootDir, "index.html")))
+{
+    var physicalProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(wwwrootDir);
+    app.MapFallbackToFile("index.html", new StaticFileOptions { FileProvider = physicalProvider });
+}
+else
+{
+    app.MapFallbackToFile("index.html");
+}
 
 app.Run();

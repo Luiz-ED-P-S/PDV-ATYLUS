@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { History, Printer, Search, RotateCcw, CheckCircle2, Ban } from 'lucide-react';
+import { History, Printer, Search, Ban } from 'lucide-react';
 import { Venda } from '../../types';
 import { ReceiptPrintModal } from '../pos/components/ReceiptPrintModal';
 

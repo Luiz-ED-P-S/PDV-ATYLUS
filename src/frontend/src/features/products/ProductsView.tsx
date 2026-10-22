@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Package, Edit, AlertCircle } from 'lucide-react';
+import { Search, Plus, Package, Edit } from 'lucide-react';
 import { Produto } from '../../types';
 import { pdvApi } from '../../services/api';
 
@@ -119,7 +119,20 @@ export const ProductsView: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1a2938]">
-              {produtosFiltrados.map(prod => {
+              {carregando ? (
+                <tr>
+                  <td colSpan={8} className="p-8 text-center text-slate-500 font-mono">
+                    Carregando catálogo de produtos...
+                  </td>
+                </tr>
+              ) : produtosFiltrados.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="p-8 text-center text-slate-500 font-mono">
+                    Nenhum produto encontrado.
+                  </td>
+                </tr>
+              ) : (
+                produtosFiltrados.map(prod => {
                 const isBaixo = prod.estoqueAtual <= prod.estoqueMinimo;
                 return (
                   <tr key={prod.id} className="hover:bg-[#14212e] text-slate-300">
@@ -149,7 +162,7 @@ export const ProductsView: React.FC = () => {
                     </td>
                   </tr>
                 );
-              })}
+              }))}
             </tbody>
           </table>
         </div>

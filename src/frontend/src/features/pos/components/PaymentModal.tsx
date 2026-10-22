@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { X, DollarSign, QrCode, CreditCard, CheckCircle2, Copy, Check, Play, Plus, Trash2, User } from 'lucide-react';
 import { FormaPagamento, PagamentoItem, PixGenerateResult, Venda } from '../../../types';
 import { useCartStore } from '../../../store/useCartStore';
-import { useCashierStore } from '../../../store/useCashierStore';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { pdvApi } from '../../../services/api';
 import { sound } from '../../../services/sound';
@@ -15,7 +14,6 @@ interface PaymentModalProps {
 
 export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onVendaConcluida }) => {
   const { getTotalLiquido, limparCarrinhoAbaAtual, getItens, getDesconto, getAbaAtiva, setClienteAba } = useCartStore();
-  const caixa = useCashierStore(state => state.caixa);
   const operador = useAuthStore(state => state.operador);
 
   const abaAtiva = getAbaAtiva();
