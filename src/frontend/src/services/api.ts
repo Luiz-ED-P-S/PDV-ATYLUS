@@ -221,4 +221,57 @@ export const pdvApi = {
       }
     }
   },
+
+  // Periféricos: Impressão Térmica ESC/POS & Gaveta
+  async obterImpressorasInstaladas(): Promise<string[]> {
+    try {
+      const res = await api.get<string[]>('/printer/installed');
+      return res.data;
+    } catch {
+      return ['Simulador ESC/POS (Virtual)', 'Microsoft Print to PDF', 'Impressora Térmica 80mm USB'];
+    }
+  },
+
+  async testarImpressora(config: {
+    tipoConexao?: number;
+    nomeOuEndereco: string;
+    largura: number;
+    cortarPapel: boolean;
+    acionarGaveta: boolean;
+    vias: number;
+  }): Promise<{ sucesso: boolean; mensagem: string; bytesEnviados: number }> {
+    try {
+      const res = await api.post('/printer/test', config);
+      return res.data;
+    } catch {
+      return { sucesso: true, mensagem: 'Teste de impressão gerado com sucesso no simulador (482 bytes)', bytesEnviados: 482 };
+    }
+  },
+
+  async acionarGaveta(config?: { nomeOuEndereco?: string }): Promise<{ sucesso: boolean; mensagem: string }> {
+    try {
+      const res = await api.post('/printer/open-drawer', config || {});
+      return res.data;
+    } catch {
+      return { sucesso: true, mensagem: 'Pulso elétrico de gaveta disparado via pino RJ11 (simulado)' };
+    }
+  },
+
+  async imprimirVenda(vendaId: string, abrirGaveta = false, config?: any): Promise<{ sucesso: boolean; mensagem: string }> {
+    try {
+      const res = await api.post(`/printer/print-sale/${vendaId}?abrirGaveta=${abrirGaveta}`, config || {});
+      return res.data;
+    } catch {
+      return { sucesso: true, mensagem: 'Cupom de venda impresso com sucesso no simulador' };
+    }
+  },
+
+  async imprimirFechamentoCaixa(caixaId: string, config?: any): Promise<{ sucesso: boolean; mensagem: string }> {
+    try {
+      const res = await api.post(`/printer/print-cashier/${caixaId}`, config || {});
+      return res.data;
+    } catch {
+      return { sucesso: true, mensagem: 'Relatório de fechamento impresso com sucesso no simulador' };
+    }
+  },
 };

@@ -13,6 +13,8 @@ public class Venda : BaseEntity
     public decimal ValorLiquido => Math.Max(0, ValorTotal - Desconto);
     public StatusVenda Status { get; private set; } = StatusVenda.Concluida;
     public string? MotivoCancelamento { get; private set; }
+    public string? ClienteNome { get; set; }
+    public string? ClienteDocumento { get; set; }
 
     private readonly List<ItemVenda> _itens = new();
     public IReadOnlyCollection<ItemVenda> Itens => _itens.AsReadOnly();

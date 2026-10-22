@@ -130,6 +130,18 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onV
       venda.clienteNome = clienteNome;
       venda.clienteDocumento = clienteDoc;
 
+      // Disparo automático de impressão térmica ESC/POS se configurado
+      try {
+        const printerRaw = localStorage.getItem('pdv_printer_config_v1');
+        const printerConfig = printerRaw ? JSON.parse(printerRaw) : null;
+        if (printerConfig?.imprimirAutomatico !== false) {
+          const temDinheiro = pagamentosLancados.some(p => p.forma === 'Dinheiro');
+          pdvApi.imprimirVenda(venda.id, temDinheiro && (printerConfig?.acionarGaveta ?? true), printerConfig);
+        }
+      } catch {
+        // Impressão em segundo plano sem bloquear o caixa
+      }
+
       sound.playSuccessChime();
       limparCarrinhoAbaAtual();
       onClose();

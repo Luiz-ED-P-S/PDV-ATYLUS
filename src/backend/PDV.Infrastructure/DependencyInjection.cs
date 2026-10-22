@@ -28,6 +28,7 @@ public static class DependencyInjection
         // Serviços Externos e de Suporte
         services.AddSingleton<IPixService, PixSimulatorService>();
         services.AddScoped<IGoogleDriveBackupService, GoogleDriveBackupService>();
+        services.AddSingleton<IThermalPrinterService, ThermalPrinterService>();
         services.AddHttpClient<ISpreadsheetAiService, SpreadsheetAiService>();
 
         return services;

@@ -59,3 +59,24 @@ public record MapeamentoColunasResult(
     string? ColunaEstoque,
     double Confianca,
     string? Observacoes);
+
+public record ConfiguracaoImpressora(
+    TipoConexaoImpressora TipoConexao = TipoConexaoImpressora.SpoolerWindows,
+    string NomeOuEndereco = "Default",
+    LarguraBobina Largura = LarguraBobina.Mm80,
+    bool CortarPapel = true,
+    bool AcionarGaveta = true,
+    int Vias = 1
+);
+
+public record ResultadoImpressao(bool Sucesso, string Mensagem, int BytesEnviados = 0);
+
+public interface IThermalPrinterService
+{
+    Task<ResultadoImpressao> ImprimirCupomVendaAsync(Venda venda, ConfiguracaoImpressora? config = null, bool abrirGaveta = false, CancellationToken cancellationToken = default);
+    Task<ResultadoImpressao> ImprimirFechamentoCaixaAsync(Caixa caixa, List<Venda> vendas, ConfiguracaoImpressora? config = null, CancellationToken cancellationToken = default);
+    Task<ResultadoImpressao> ImprimirComprovanteMovimentacaoAsync(Caixa caixa, MovimentacaoCaixa mov, ConfiguracaoImpressora? config = null, CancellationToken cancellationToken = default);
+    Task<ResultadoImpressao> AcionarGavetaAsync(ConfiguracaoImpressora? config = null, CancellationToken cancellationToken = default);
+    Task<ResultadoImpressao> TestarImpressaoAsync(ConfiguracaoImpressora config, CancellationToken cancellationToken = default);
+    List<string> ObterImpressorasInstaladas();
+}

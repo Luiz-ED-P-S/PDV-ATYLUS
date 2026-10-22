@@ -853,6 +853,82 @@
                     </h2>
                   </div>
 
+                  {/* Card: Impressão Térmica ESC/POS & Gaveta */}
+                  <div className="p-5 bg-[#0d1620] border border-[#1f3042] rounded-2xl space-y-4">
+                    <div className="flex justify-between items-center border-b border-[#1f3042] pb-3">
+                      <div>
+                        <h3 className="font-bold text-white text-sm">🖨️ Impressão Térmica Direta & Gaveta (ESC/POS)</h3>
+                        <p className="text-slate-400 font-sans text-[11px]">Suporte nativo a Epson, Elgin, Bematech, Daruma e impressoras de rede via comando binário direto.</p>
+                      </div>
+                      <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-900 text-[10px]">
+                        Spooler Ativo
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-slate-400 text-[11px]">Impressora Selecionada (Windows / USB / Rede):</label>
+                        <select className="w-full px-3 py-2 bg-[#060b10] border border-[#1f3042] rounded-xl text-white font-mono text-xs focus:outline-none focus:border-sky-500">
+                          <option>Simulador ESC/POS (Virtual)</option>
+                          <option>Microsoft Print to PDF</option>
+                          <option>Epson TM-T20X (USB)</option>
+                          <option>Elgin i9 / i8 (USB)</option>
+                          <option>Bematech MP-4200 TH (USB)</option>
+                          <option>Impressora de Rede (192.168.1.200:9100)</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-slate-400 text-[11px]">Largura da Bobina Térmica:</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button type="button" className="py-2 rounded-xl border bg-sky-600/20 border-sky-500 text-sky-300 font-bold text-center">
+                            80mm (48 colunas)
+                          </button>
+                          <button type="button" className="py-2 rounded-xl border bg-[#060b10] border-[#1f3042] text-slate-400 hover:text-white font-bold text-center">
+                            58mm (32 colunas)
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3 pt-1">
+                      <label className="flex items-center gap-2 p-2.5 rounded-xl bg-[#060b10] border border-[#1f3042] cursor-pointer text-slate-300">
+                        <input type="checkbox" defaultChecked className="w-4 h-4 text-sky-600" />
+                        <span>✂️ Corte Automático</span>
+                      </label>
+                      <label className="flex items-center gap-2 p-2.5 rounded-xl bg-[#060b10] border border-[#1f3042] cursor-pointer text-slate-300">
+                        <input type="checkbox" defaultChecked className="w-4 h-4 text-sky-600" />
+                        <span>📥 Abrir Gaveta RJ11</span>
+                      </label>
+                      <label className="flex items-center gap-2 p-2.5 rounded-xl bg-[#060b10] border border-[#1f3042] cursor-pointer text-slate-300">
+                        <input type="checkbox" defaultChecked className="w-4 h-4 text-sky-600" />
+                        <span>🖨️ Imprimir ao Finalizar</span>
+                      </label>
+                    </div>
+
+                    <div className="flex gap-3 pt-2">
+                      <button
+                        onClick={() => {
+                          sound.playChime();
+                          alert('Comando binário ESC/POS enviado com sucesso (482 bytes)! Corte de papel e pulso de gaveta acionados.');
+                        }}
+                        className="px-4 py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl transition flex items-center gap-2"
+                      >
+                        <span>▶️</span> Testar Impressão ESC/POS
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          sound.playBeep();
+                          alert('Pulso elétrico disparado no pino 2 da porta RJ11 da impressora! Gaveta aberta.');
+                        }}
+                        className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl transition flex items-center gap-2"
+                      >
+                        <span>📥</span> Testar Abertura de Gaveta
+                      </button>
+                    </div>
+                  </div>
+
                   <div className="p-5 bg-[#0d1620] border border-[#1f3042] rounded-2xl space-y-2">
                     <h3 className="font-bold text-white text-sm">☁️ Backup Google Drive</h3>
                     <p className="text-slate-400">Banco SQLite local salvo automaticamente em .zip na pasta /backups e sincronizado com o Drive.</p>

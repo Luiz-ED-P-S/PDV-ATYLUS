@@ -31,3 +31,17 @@ public enum PerfilOperador
     Operador = 1,
     Supervisor = 2
 }
+
+public enum TipoConexaoImpressora
+{
+    SpoolerWindows = 1,
+    RedeTcp = 2,
+    SerialCom = 3,
+    SimuladorArquivo = 4
+}
+
+public enum LarguraBobina
+{
+    Mm80 = 80, // Padrão 48 colunas
+    Mm58 = 58  // Padrão 32 colunas
+}
