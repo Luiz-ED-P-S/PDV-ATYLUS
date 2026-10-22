@@ -1,0 +1,45 @@
+# Template de Configuração do Codex CLI para OmniRoute
+# Caminho de destino: ~/.codex/config.toml
+
+model = "auto"
+model_provider = "omniroute"
+
+[model_providers.omniroute]
+base_url = "http://localhost:2024/v1"
+api_key = "sk-omniroute-local"
+wire_api = "responses"
+
+# 1. Perfil Auto (Roteamento inteligente e fallback automático)
+[profiles.auto]
+model = "auto"
+model_provider = "omniroute"
+
+# 2. Perfil Rápido (Baixa latência para edições curtas)
+[profiles.fast]
+model = "gemini-1.5-flash"
+model_provider = "omniroute"
+
+# 3. Perfil Inteligente / Flagship (Claude 3.7 / Opus)
+[profiles.smart]
+model = "claude-opus-4-7"
+model_provider = "omniroute"
+
+# 4. Perfil Raciocínio (DeepSeek R1 / o1)
+[profiles.reasoning]
+model = "deepseek-r1"
+model_provider = "omniroute"
+
+# 5. Perfil Custo Otimizado
+[profiles.cost-optimized]
+model = "cost-optimized"
+model_provider = "omniroute"
+
+# 6. Perfil Código (GPT-4o)
+[profiles.code]
+model = "gpt-4o"
+model_provider = "omniroute"
+
+# 7. Perfil Assinatura (Subscription)
+[profiles.subscription]
+model = "subscription"
+model_provider = "omniroute"
