@@ -1,0 +1,56 @@
+# .NET / Visual Studio
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+*.user
+*.userosscache
+*.suo
+*.userprefs
+*.ide
+.vs/
+.idea/
+.vscode/
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+build/
+dist/
+
+# SQLite Databases & Backups (Local storage)
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+/backups/
+/src/backend/PDV.API/pdv.db*
+
+# Sensitive Files & API Keys
+credentials.json
+client_secret*.json
+*.p12
+*.pem
+*.key
+appsettings.Production.json
+appsettings.Local.json
+
+# Node.js / Vite / React
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.vite/
+.env.local
+.env.*.local
+
+# OS Generated
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
