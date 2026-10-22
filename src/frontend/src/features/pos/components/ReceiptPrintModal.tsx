@@ -42,7 +42,7 @@ export const ReceiptPrintModal: React.FC<ReceiptPrintModalProps> = ({ venda, onC
               <p className="text-[10px] font-bold mt-1">*** CUPOM NÃO FISCAL ***</p>
             </div>
 
-            {/* Metadados da Venda */}
+            {/* Metadados da Venda e Cliente */}
             <div className="text-[10px] space-y-0.5 border-b border-dashed border-slate-400 pb-2 mb-2">
               <div className="flex justify-between">
                 <span>Venda: #{venda.id.slice(-6).toUpperCase()}</span>
@@ -52,6 +52,13 @@ export const ReceiptPrintModal: React.FC<ReceiptPrintModalProps> = ({ venda, onC
                 <span>Operador: {venda.operadorId}</span>
                 <span>Terminal: 01</span>
               </div>
+
+              {venda.clienteNome && (
+                <div className="pt-1 text-slate-700 font-semibold border-t border-slate-200 mt-1">
+                  <div>Cliente: {venda.clienteNome}</div>
+                  {venda.clienteDocumento && <div>CPF/CNPJ: {venda.clienteDocumento}</div>}
+                </div>
+              )}
             </div>
 
             {/* Tabela de Itens */}
@@ -62,18 +69,21 @@ export const ReceiptPrintModal: React.FC<ReceiptPrintModalProps> = ({ venda, onC
                 <span>TOTAL</span>
               </div>
 
-              {venda.itens.map((item, idx) => (
-                <div key={idx} className="mb-1 text-[10px]">
-                  <div className="font-semibold">{item.produtoNome}</div>
-                  <div className="flex justify-between text-slate-700">
-                    <span>{item.quantidade} x R$ {item.precoUnitario.toFixed(2)}</span>
-                    <span className="font-bold">R$ {item.subtotal.toFixed(2)}</span>
+              {venda.itens.map((item, idx) => {
+                const isKg = item.unidadeMedida === 'KG';
+                return (
+                  <div key={idx} className="mb-1 text-[10px]">
+                    <div className="font-semibold">{item.produtoNome}</div>
+                    <div className="flex justify-between text-slate-700">
+                      <span>{isKg ? `${item.quantidade.toFixed(3)} kg` : item.quantidade} x R$ {item.precoUnitario.toFixed(2)}</span>
+                      <span className="font-bold">R$ {item.subtotal.toFixed(2)}</span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
-            {/* Totais e Pagamentos */}
+            {/* Totais e Múltiplos Pagamentos */}
             <div className="space-y-1 text-xs border-b border-dashed border-slate-400 pb-2 mb-2">
               <div className="flex justify-between">
                 <span>SUBTOTAL:</span>
@@ -90,16 +100,17 @@ export const ReceiptPrintModal: React.FC<ReceiptPrintModalProps> = ({ venda, onC
                 <span>R$ {venda.valorLiquido.toFixed(2)}</span>
               </div>
 
-              <div className="pt-2 text-[10px]">
+              <div className="pt-2 text-[10px] space-y-0.5">
+                <div className="font-bold text-slate-800">Formas de Pagamento:</div>
                 {venda.pagamentos.map((pag, idx) => (
                   <div key={idx} className="flex justify-between">
-                    <span>FORMA ({pag.formaPagamento}):</span>
+                    <span>• {pag.formaPagamento}:</span>
                     <span>R$ {pag.valor.toFixed(2)}</span>
                   </div>
                 ))}
                 {venda.pagamentos.some(p => p.troco > 0) && (
-                  <div className="flex justify-between font-bold">
-                    <span>TROCO:</span>
+                  <div className="flex justify-between font-bold pt-1 border-t border-slate-200">
+                    <span>TROCO DEVOLVIDO:</span>
                     <span>R$ {venda.pagamentos.find(p => p.troco > 0)?.troco.toFixed(2)}</span>
                   </div>
                 )}

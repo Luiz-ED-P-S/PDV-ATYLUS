@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PDV Atylus - Teste Interativo de Frente de Caixa</title>
+  <title>PDV Atylus - Teste Interativo de Frente de Caixa (Inspirado no PDVOpen & Horus)</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- React & ReactDOM CDN -->
@@ -109,13 +109,15 @@
     }
     const sound = new SoundManager();
 
-    // --- CATÁLOGO DE PRODUTOS DEMO ---
+    // --- CATÁLOGO DE PRODUTOS DEMO (UNIDADE E QUILO/BALANÇA) ---
     const PRODUTOS_DEMO = [
-      { id: '1', codigoBarras: '7894900010015', nome: 'Refrigerante Coca-Cola 2L', preco: 9.50, estoque: 50 },
-      { id: '2', codigoBarras: '7891000100103', nome: 'Leite Integral Ninho 1L', preco: 5.80, estoque: 30 },
-      { id: '3', codigoBarras: '7891910000197', nome: 'Açúcar Refinado União 1kg', preco: 4.20, estoque: 40 },
-      { id: '4', codigoBarras: '7896004000153', nome: 'Café Torrado e Moído Pilão 500g', preco: 18.90, estoque: 25 },
-      { id: '5', codigoBarras: '7891024131238', nome: 'Biscoito Recheado Passatempo 130g', preco: 3.20, estoque: 60 },
+      { id: '1', codigoBarras: '7894900010015', nome: 'Refrigerante Coca-Cola 2L', preco: 9.50, estoque: 50, unidade: 'UN' },
+      { id: '2', codigoBarras: '7891000100103', nome: 'Leite Integral Ninho 1L', preco: 5.80, estoque: 30, unidade: 'UN' },
+      { id: '3', codigoBarras: '7891910000197', nome: 'Açúcar Refinado União 1kg', preco: 4.20, estoque: 40, unidade: 'UN' },
+      { id: '4', codigoBarras: '7896004000153', nome: 'Café Torrado e Moído Pilão 500g', preco: 18.90, estoque: 25, unidade: 'UN' },
+      { id: '5', codigoBarras: '7891024131238', nome: 'Biscoito Recheado Passatempo 130g', preco: 3.20, estoque: 60, unidade: 'UN' },
+      { id: '10', codigoBarras: '10', codigoItemBalanca: '10', nome: 'Queijo Muçarela Fatiado (Balança)', preco: 49.90, estoque: 15.5, unidade: 'KG' },
+      { id: '20', codigoBarras: '20', codigoItemBalanca: '20', nome: 'Pão Francês Tradicional (Balança)', preco: 14.50, estoque: 20.0, unidade: 'KG' },
     ];
 
     function App() {
@@ -126,13 +128,23 @@
         { id: 1, tipo: 'Suprimento', valor: 100.00, motivo: 'Fundo inicial de troco', data: new Date().toLocaleTimeString() }
       ]);
 
-      // Estado do Carrinho
-      const [itens, setItens] = useState([
-        { id: 'item-1', produtoId: '1', codigoBarras: '7894900010015', nome: 'Refrigerante Coca-Cola 2L', preco: 9.50, qtd: 2, subtotal: 19.00 },
-        { id: 'item-2', produtoId: '4', codigoBarras: '7896004000153', nome: 'Café Torrado e Moído Pilão 500g', preco: 18.90, qtd: 1, subtotal: 18.90 }
+      // Múltiplas Abas de Atendimento (PDVOpen)
+      const [abas, setAbas] = useState([
+        {
+          id: 'aba-1',
+          titulo: 'Venda 1',
+          clienteNome: '',
+          clienteDoc: '',
+          desconto: 0,
+          itens: [
+            { id: 'it-1', produtoId: '1', codigoBarras: '7894900010015', nome: 'Refrigerante Coca-Cola 2L', preco: 9.50, qtd: 2, unidade: 'UN', subtotal: 19.00 },
+            { id: 'it-2', produtoId: '10', codigoBarras: '10', nome: 'Queijo Muçarela Fatiado', preco: 49.90, qtd: 0.350, unidade: 'KG', subtotal: 17.47 }
+          ],
+          selectedId: 'it-1'
+        }
       ]);
-      const [selectedId, setSelectedId] = useState('item-1');
-      const [desconto, setDesconto] = useState(0);
+      const [abaAtivaId, setAbaAtivaId] = useState('aba-1');
+
       const [codigoInput, setCodigoInput] = useState('');
       const [erroMsg, setErroMsg] = useState(null);
       const [isMuted, setIsMuted] = useState(false);
@@ -146,16 +158,41 @@
 
       const barcodeInputRef = useRef(null);
 
+      const abaAtiva = abas.find(a => a.id === abaAtivaId) || abas[0];
+      const itens = abaAtiva.itens;
+      const selectedId = abaAtiva.selectedId;
+      const desconto = abaAtiva.desconto;
+
       // Foco automático
       useEffect(() => {
         if (!modalPagamento && !modalBusca && !modalCaixa && !modalImportador && !vendaConcluida) {
           barcodeInputRef.current?.focus();
         }
-      }, [modalPagamento, modalBusca, modalCaixa, modalImportador, vendaConcluida]);
+      }, [modalPagamento, modalBusca, modalCaixa, modalImportador, vendaConcluida, abaAtivaId]);
 
-      // Atalhos Globais F1-F4, Del, +, -, Esc
+      // Atalhos Globais (F1-F4, Del, +, -, Esc, Ctrl+T, Ctrl+W, Ctrl+1..5)
       useEffect(() => {
         const onKeyDown = (e) => {
+          if (e.ctrlKey) {
+            if (e.key === 't' || e.key === 'T') {
+              e.preventDefault();
+              criarNovaAba();
+              return;
+            }
+            if (e.key === 'w' || e.key === 'W') {
+              e.preventDefault();
+              fecharAba(abaAtivaId);
+              return;
+            }
+            const num = parseInt(e.key, 10);
+            if (!isNaN(num) && num >= 1 && num <= abas.length) {
+              e.preventDefault();
+              setAbaAtivaId(abas[num - 1].id);
+              sound.playScan();
+              return;
+            }
+          }
+
           if (modalPagamento || modalBusca || modalCaixa || modalImportador || vendaConcluida) {
             if (e.key === 'Escape') {
               setModalPagamento(false);
@@ -185,58 +222,104 @@
             removerItem(selectedId);
           } else if (e.key === 'Escape') {
             e.preventDefault();
-            if (itens.length > 0 && confirm('Deseja cancelar a venda atual?')) {
-              setItens([]);
+            if (itens.length > 0 && confirm('Deseja limpar os itens desta venda?')) {
+              atualizarAbaAtual({ itens: [], selectedId: null, desconto: 0 });
             }
           }
         };
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
-      }, [modalPagamento, modalBusca, modalCaixa, modalImportador, vendaConcluida, itens, caixaAberto, selectedId]);
+      }, [modalPagamento, modalBusca, modalCaixa, modalImportador, vendaConcluida, itens, caixaAberto, selectedId, abaAtivaId, abas]);
 
-      // Adicionar produto ao carrinho
-      const adicionarAoCarrinho = (produto, quantidade = 1) => {
+      const criarNovaAba = (nome) => {
+        const prox = abas.length + 1;
+        const nova = {
+          id: 'aba-' + Date.now(),
+          titulo: nome || `Venda ${prox}`,
+          clienteNome: '',
+          clienteDoc: '',
+          desconto: 0,
+          itens: [],
+          selectedId: null
+        };
+        setAbas(prev => [...prev, nova]);
+        setAbaAtivaId(nova.id);
+        sound.playScan();
+      };
+
+      const fecharAba = (id) => {
+        if (abas.length <= 1) {
+          atualizarAbaAtual({ itens: [], selectedId: null, desconto: 0 });
+          return;
+        }
+        const filtradas = abas.filter(a => a.id !== id);
+        setAbas(filtradas);
+        setAbaAtivaId(filtradas[0].id);
+      };
+
+      const atualizarAbaAtual = (dados) => {
+        setAbas(prev => prev.map(a => a.id === abaAtivaId ? { ...a, ...dados } : a));
+      };
+
+      const adicionarAoCarrinho = (produto, quantidade = 1, unidade) => {
         sound.playScan();
         setErroMsg(null);
-        setItens(prev => {
-          const ex = prev.find(i => i.produtoId === produto.id);
+        const un = unidade || produto.unidade || 'UN';
+
+        setAbas(prev => prev.map(aba => {
+          if (aba.id !== abaAtivaId) return aba;
+
+          const ex = aba.itens.find(i => i.produtoId === produto.id && i.unidade === un);
+          let nItens;
+          let sId;
+
           if (ex) {
-            const nQtd = ex.qtd + quantidade;
-            return prev.map(i => i.produtoId === produto.id ? { ...i, qtd: nQtd, subtotal: nQtd * i.preco } : i);
+            const nQtd = parseFloat((ex.qtd + quantidade).toFixed(3));
+            nItens = aba.itens.map(i => i.id === ex.id ? { ...i, qtd: nQtd, subtotal: parseFloat((nQtd * i.preco).toFixed(2)) } : i);
+            sId = ex.id;
+          } else {
+            const novo = {
+              id: 'it-' + Date.now(),
+              produtoId: produto.id,
+              codigoBarras: produto.codigoBarras,
+              nome: produto.nome,
+              preco: produto.preco,
+              qtd: quantidade,
+              unidade: un,
+              subtotal: parseFloat((quantidade * produto.preco).toFixed(2))
+            };
+            nItens = [...aba.itens, novo];
+            sId = novo.id;
           }
-          const novo = {
-            id: 'item-' + Date.now(),
-            produtoId: produto.id,
-            codigoBarras: produto.codigoBarras,
-            nome: produto.nome,
-            preco: produto.preco,
-            qtd: quantidade,
-            subtotal: quantidade * produto.preco
-          };
-          setSelectedId(novo.id);
-          return [...prev, novo];
-        });
+          return { ...aba, itens: nItens, selectedId: sId };
+        }));
       };
 
       const alterarQtd = (id, delta) => {
-        setItens(prev => prev.map(i => {
-          if (i.id === id) {
-            const n = Math.max(1, i.qtd + delta);
-            return { ...i, qtd: n, subtotal: n * i.preco };
-          }
-          return i;
+        setAbas(prev => prev.map(aba => {
+          if (aba.id !== abaAtivaId) return aba;
+          const nItens = aba.itens.map(i => {
+            if (i.id === id) {
+              const passo = i.unidade === 'KG' ? 0.1 : 1;
+              const nQtd = Math.max(passo, parseFloat((i.qtd + (delta > 0 ? passo : -passo)).toFixed(3)));
+              return { ...i, qtd: nQtd, subtotal: parseFloat((nQtd * i.preco).toFixed(2)) };
+            }
+            return i;
+          });
+          return { ...aba, itens: nItens };
         }));
       };
 
       const removerItem = (id) => {
-        setItens(prev => {
-          const f = prev.filter(i => i.id !== id);
-          if (f.length > 0) setSelectedId(f[f.length - 1].id);
-          return f;
-        });
+        setAbas(prev => prev.map(aba => {
+          if (aba.id !== abaAtivaId) return aba;
+          const filtrados = aba.itens.filter(i => i.id !== id);
+          const sId = filtrados.length > 0 ? filtrados[filtrados.length - 1].id : null;
+          return { ...aba, itens: filtrados, selectedId: sId };
+        }));
       };
 
-      // Processar Leitor de Código de Barras
+      // Leitor com Suporte a Multiplicação e Balança EAN-13 iniciando com '2' (PDVOpen)
       const handleBarcodeSubmit = (e) => {
         e.preventDefault();
         const entrada = codigoInput.trim();
@@ -256,6 +339,21 @@
           if (!isNaN(q) && q > 0) { qtd = q; cod = p[1].trim(); }
         }
 
+        // Reconhecimento de Código de Balança Nacional EAN-13 (começa com 2)
+        if (cod.startsWith('2') && (cod.length === 12 || cod.length === 13)) {
+          const codProd = cod.substring(1, 6).replace(/^0+/, ''); // extrai código do item
+          const centavos = parseInt(cod.substring(6, 12), 10);
+          const valorReais = centavos / 100.0;
+
+          const prodBalanca = PRODUTOS_DEMO.find(p => p.codigoItemBalanca === codProd || p.id === codProd);
+          if (prodBalanca) {
+            const pesoKg = parseFloat((valorReais / prodBalanca.preco).toFixed(3));
+            adicionarAoCarrinho(prodBalanca, pesoKg, 'KG');
+            setCodigoInput('');
+            return;
+          }
+        }
+
         const prod = PRODUTOS_DEMO.find(p => p.codigoBarras === cod);
         if (prod) {
           adicionarAoCarrinho(prod, qtd);
@@ -268,7 +366,7 @@
 
       const totalBruto = itens.reduce((acc, i) => acc + i.subtotal, 0);
       const totalLiquido = Math.max(0, totalBruto - desconto);
-      const totalItens = itens.reduce((acc, i) => acc + i.qtd, 0);
+      const totalItens = itens.reduce((acc, i) => acc + (i.unidade === 'KG' ? 1 : i.qtd), 0);
 
       return (
         <div className="flex flex-col h-screen overflow-hidden">
@@ -298,6 +396,56 @@
             </div>
           </header>
 
+          {/* BARRA DE MÚLTIPLAS ABAS (PDVOpen Multi-Vendas) */}
+          <div className="bg-slate-900/90 border-b border-slate-800 px-3 py-1.5 flex items-center gap-2 overflow-x-auto select-none font-mono">
+            <span className="text-[11px] font-bold text-slate-500 uppercase mr-1">Atendimento:</span>
+            {abas.map((aba, index) => {
+              const isAtiva = aba.id === abaAtivaId;
+              const totalAba = aba.itens.reduce((acc, i) => acc + i.subtotal, 0);
+
+              return (
+                <div
+                  key={aba.id}
+                  onClick={() => setAbaAtivaId(aba.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition border ${
+                    isAtiva
+                      ? 'bg-emerald-600 text-white border-emerald-500 shadow-md'
+                      : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:bg-slate-800 text-slate-300'
+                  }`}
+                >
+                  <span>{index + 1}. {aba.titulo}</span>
+                  {totalAba > 0 && (
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded font-bold ${isAtiva ? 'bg-emerald-700 text-white' : 'bg-slate-700 text-slate-200'}`}>
+                      R$ {totalAba.toFixed(2)}
+                    </span>
+                  )}
+                  {abas.length > 1 && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); fecharAba(aba.id); }}
+                      className="hover:text-red-300 ml-0.5 text-xs font-bold"
+                      title="Fechar aba (Ctrl+W)"
+                    >✕</button>
+                  )}
+                </div>
+              );
+            })}
+
+            <button
+              onClick={() => criarNovaAba()}
+              title="Abrir nova venda em espera (Ctrl+T)"
+              className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-bold flex items-center gap-1 transition"
+            >
+              <span>+ Nova Venda</span>
+              <kbd className="text-[10px] text-slate-500 bg-slate-900 px-1 rounded">Ctrl+T</kbd>
+            </button>
+
+            {abaAtiva.clienteNome && (
+              <div className="ml-auto text-xs text-sky-400 flex items-center gap-1.5 bg-sky-950/60 px-2.5 py-1 rounded-lg border border-sky-800">
+                <span>👤 Cliente: <strong>{abaAtiva.clienteNome}</strong></span>
+              </div>
+            )}
+          </div>
+
           {/* ÁREA DE VENDA */}
           <div className="flex-1 flex p-3 gap-3 overflow-hidden">
             {/* LADO ESQUERDO: Bipador e Carrinho */}
@@ -307,7 +455,7 @@
                 <input
                   ref={barcodeInputRef}
                   type="text"
-                  placeholder="Passe o leitor ou digite Qtd*Código (Ex: 3*7894900010015)..."
+                  placeholder="Bipe código, digite 3*código ou balança 2000100012505..."
                   value={codigoInput}
                   onChange={e => setCodigoInput(e.target.value)}
                   className="w-full pl-4 pr-24 py-3.5 bg-slate-900 border-2 border-slate-700 rounded-2xl text-xl font-mono font-bold text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 shadow-lg tracking-wider"
@@ -327,7 +475,7 @@
                 {itens.length === 0 ? (
                   <div className="flex-1 flex flex-col items-center justify-center text-slate-500 p-8">
                     <span className="text-4xl mb-2">🛒</span>
-                    <h3 className="text-xl font-bold text-slate-400">Carrinho Vazio</h3>
+                    <h3 className="text-xl font-bold text-slate-400">Venda sem Itens ({abaAtiva.titulo})</h3>
                     <p className="text-sm mt-1">Bipe um item ou aperte <kbd className="px-2 py-0.5 bg-slate-800 text-emerald-400 rounded">F2</kbd> para pesquisar.</p>
                   </div>
                 ) : (
@@ -339,7 +487,7 @@
                           <th className="p-3 w-36">Código</th>
                           <th className="p-3 font-sans">Descrição</th>
                           <th className="p-3 text-right w-24">Unitário</th>
-                          <th className="p-3 text-center w-28">Qtd</th>
+                          <th className="p-3 text-center w-36">Qtd / Peso</th>
                           <th className="p-3 text-right w-28">Subtotal</th>
                           <th className="p-3 text-center w-12">X</th>
                         </tr>
@@ -348,17 +496,20 @@
                         {itens.map((i, idx) => (
                           <tr
                             key={i.id}
-                            onClick={() => setSelectedId(i.id)}
+                            onClick={() => atualizarAbaAtual({ selectedId: i.id })}
                             className={`cursor-pointer transition ${i.id === selectedId ? 'bg-emerald-950/40 text-white border-l-4 border-emerald-500' : 'hover:bg-slate-800/40 text-slate-300'}`}
                           >
                             <td className="p-3 text-center text-xs text-slate-500">{String(idx + 1).padStart(2, '0')}</td>
                             <td className="p-3 text-xs text-slate-400">{i.codigoBarras}</td>
-                            <td className="p-3 font-sans font-medium text-slate-200">{i.nome}</td>
+                            <td className="p-3 font-sans font-medium text-slate-200">
+                              {i.nome}
+                              {i.unidade === 'KG' && <span className="ml-2 px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 text-[10px] border border-amber-800 font-mono font-bold">KG</span>}
+                            </td>
                             <td className="p-3 text-right">R$ {i.preco.toFixed(2)}</td>
                             <td className="p-3 text-center">
                               <div className="flex items-center justify-center gap-1.5" onClick={e => e.stopPropagation()}>
                                 <button onClick={() => alterarQtd(i.id, -1)} className="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 font-bold">-</button>
-                                <span className="w-8 text-center font-bold text-white">{i.qtd}</span>
+                                <span className="w-12 text-center font-bold text-white text-xs">{i.unidade === 'KG' ? `${i.qtd.toFixed(3)} kg` : i.qtd}</span>
                                 <button onClick={() => alterarQtd(i.id, 1)} className="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 font-bold">+</button>
                               </div>
                             </td>
@@ -390,12 +541,12 @@
                   </div>
                   <div className="flex justify-between text-xs text-slate-500 pt-1 border-t border-slate-800">
                     <span>TOTAL DE ITENS:</span>
-                    <span>{totalItens} un</span>
+                    <span>{totalItens}</span>
                   </div>
                 </div>
 
                 <div className="mt-4 pt-3 border-t-2 border-dashed border-slate-800 text-right">
-                  <span className="text-xs text-emerald-400 font-bold uppercase tracking-wider block">VALOR LÍQUIDO</span>
+                  <span className="text-xs text-emerald-400 font-bold uppercase tracking-wider block">VALOR LÍQUIDO ({abaAtiva.titulo})</span>
                   <div className="text-5xl font-black text-emerald-400 tracking-tight mt-1">
                     R$ {totalLiquido.toFixed(2)}
                   </div>
@@ -437,40 +588,44 @@
                     onClick={() => setModalImportador(true)}
                     className="w-full py-3 px-4 rounded-xl bg-indigo-950/60 hover:bg-indigo-900/70 border border-indigo-800/60 text-indigo-200 font-bold text-sm flex justify-between items-center"
                   >
-                    <span>📊 IMPORTADOR PLANILHA IA</span>
+                    <span>📊 IMPORTAR IA & NF-e XML</span>
                     <kbd className="px-2 py-0.5 rounded bg-indigo-900 text-indigo-300 text-xs">F4</kbd>
                   </button>
                 </div>
 
                 <button
-                  onClick={() => { if (itens.length > 0 && confirm('Cancelar venda?')) setItens([]); }}
+                  onClick={() => { if (itens.length > 0 && confirm('Limpar itens da venda atual?')) atualizarAbaAtual({ itens: [], selectedId: null, desconto: 0 }); }}
                   className="w-full py-2.5 px-3 rounded-xl bg-slate-800/60 hover:bg-red-950/50 hover:text-red-400 border border-slate-700/60 text-slate-400 text-xs font-bold flex justify-between items-center"
                 >
-                  <span>🔄 CANCELAR VENDA</span>
+                  <span>🔄 LIMPAR CARRINHO</span>
                   <kbd className="px-1.5 py-0.5 rounded bg-slate-700 text-slate-300 text-[10px]">Esc</kbd>
                 </button>
               </div>
             </div>
           </div>
 
-          {/* MODAL PAGAMENTO (F1) */}
+          {/* MODAL PAGAMENTO MULTIFORMAS (F1 - Padrão PDVOpen) */}
           {modalPagamento && (
-            <ModalPagamentoComponent
+            <ModalPagamentoMultiformasComponent
               total={totalLiquido}
+              clienteNomeInicial={abaAtiva.clienteNome}
+              clienteDocInicial={abaAtiva.clienteDoc}
               onClose={() => setModalPagamento(false)}
-              onSucesso={(pagamentoData) => {
+              onSucesso={(pagamentos, clienteInfo) => {
                 sound.playChime();
                 const venda = {
                   id: 'VND-' + Date.now().toString().slice(-6),
                   dataVenda: new Date().toISOString(),
                   operador: 'Luiz Portella',
+                  clienteNome: clienteInfo.nome,
+                  clienteDoc: clienteInfo.doc,
                   itens: [...itens],
                   subtotal: totalBruto,
                   desconto,
                   total: totalLiquido,
-                  pagamento: pagamentoData
+                  pagamentos: pagamentos
                 };
-                setItens([]);
+                fecharAba(abaAtivaId);
                 setModalPagamento(false);
                 setVendaConcluida(venda);
               }}
@@ -483,7 +638,7 @@
               produtos={PRODUTOS_DEMO}
               onClose={() => setModalBusca(false)}
               onSelecionar={p => {
-                adicionarAoCarrinho(p, 1);
+                adicionarAoCarrinho(p, p.unidade === 'KG' ? 0.5 : 1);
                 setModalBusca(false);
               }}
             />
@@ -513,21 +668,21 @@
             />
           )}
 
-          {/* MODAL IMPORTADOR IA (F4) */}
+          {/* MODAL IMPORTADOR IA & NF-e XML (F4) */}
           {modalImportador && (
-            <ModalImportadorComponent
+            <ModalImportadorAvancadoComponent
               onClose={() => setModalImportador(false)}
               onImportarNovosProdutos={novos => {
                 novos.forEach(p => PRODUTOS_DEMO.push(p));
                 setModalImportador(false);
-                alert(`${novos.length} produtos importados para o catálogo local!`);
+                alert(`${novos.length} novos produtos adicionados ao catálogo!`);
               }}
             />
           )}
 
           {/* MODAL CUPOM TÉRMICO */}
           {vendaConcluida && (
-            <ModalCupomComponent
+            <ModalCupomAvancadoComponent
               venda={vendaConcluida}
               onClose={() => setVendaConcluida(null)}
             />
@@ -536,117 +691,244 @@
       );
     }
 
-    // --- SUB-COMPONENTES MODAIS ---
-
-    function ModalPagamentoComponent({ total, onClose, onSucesso }) {
+    // --- MODAL PAGAMENTO MULTIFORMAS (PDVOpen) ---
+    function ModalPagamentoMultiformasComponent({ total, clienteNomeInicial, clienteDocInicial, onClose, onSucesso }) {
       const [forma, setForma] = useState('Dinheiro');
-      const [recebido, setRecebido] = useState(total);
-      const [pixSimulado, setPixSimulado] = useState(false);
+      const [pagamentosLancados, setPagamentosLancados] = useState([]);
+      const [clienteNome, setClienteNome] = useState(clienteNomeInicial || '');
+      const [clienteDoc, setClienteDoc] = useState(clienteDocInicial || '');
 
-      const troco = Math.max(0, recebido - total);
+      const totalPago = pagamentosLancados.reduce((acc, p) => acc + (p.valor - (p.troco || 0)), 0);
+      const restante = Math.max(0, parseFloat((total - totalPago).toFixed(2)));
+      const isQuitado = restante <= 0.009;
+
+      const [valorParcela, setValorParcela] = useState(total);
+      const [dinheiroEntregue, setDinheiroEntregue] = useState(total);
+
+      useEffect(() => {
+        if (restante > 0) {
+          setValorParcela(restante);
+          setDinheiroEntregue(restante);
+        }
+      }, [restante]);
+
+      const trocoCalculado = forma === 'Dinheiro' ? Math.max(0, dinheiroEntregue - valorParcela) : 0;
+
+      const lancar = () => {
+        if (valorParcela <= 0) return;
+        setPagamentosLancados(prev => [
+          ...prev,
+          { id: Date.now(), forma, valor: valorParcela, troco: trocoCalculado }
+        ]);
+        sound.playScan();
+      };
 
       return (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl bg-slate-900 border border-slate-700 rounded-3xl overflow-hidden shadow-2xl flex flex-col font-sans">
-            <div className="p-4 bg-slate-800/80 border-b border-slate-700 flex justify-between items-center">
-              <h3 className="font-bold text-white text-lg">💰 Pagamento (F1) - Total: R$ {total.toFixed(2)}</h3>
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-3xl bg-slate-900 border border-slate-700 rounded-3xl overflow-hidden shadow-2xl flex flex-col font-sans max-h-[95vh]">
+            <div className="p-4 bg-slate-800 border-b border-slate-700 flex justify-between items-center">
+              <div>
+                <h3 className="font-bold text-white text-lg">💰 Pagamento Multiformas (Padrão PDVOpen)</h3>
+                <p className="text-xs text-slate-400">Total a Pagar: R$ {total.toFixed(2)}</p>
+              </div>
               <button onClick={onClose} className="text-slate-400 hover:text-white font-mono text-xl">✕</button>
             </div>
 
-            <div className="grid grid-cols-4 p-4 gap-2 bg-slate-950/60 font-mono text-xs">
-              {['Dinheiro', 'Pix', 'CartaoCredito', 'CartaoDebito'].map(f => (
-                <button
-                  key={f}
-                  onClick={() => setForma(f)}
-                  className={`py-3 rounded-xl font-bold border transition ${forma === f ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-slate-800 text-slate-400 border-slate-700'}`}
-                >
-                  {f === 'CartaoCredito' ? '💳 Crédito' : f === 'CartaoDebito' ? '💳 Débito' : f === 'Pix' ? '⚡ Pix' : '💵 Dinheiro'}
-                </button>
-              ))}
+            {/* Placar de Quitação */}
+            <div className="grid grid-cols-3 p-4 bg-slate-950/70 border-b border-slate-800 text-center font-mono">
+              <div>
+                <span className="text-[10px] text-slate-400 uppercase">Total da Venda</span>
+                <div className="text-xl font-bold text-white">R$ {total.toFixed(2)}</div>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 uppercase">Já Lançado</span>
+                <div className="text-xl font-bold text-sky-400">R$ {totalPago.toFixed(2)}</div>
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-400">{isQuitado ? 'Status' : 'Falta Pagar'}</span>
+                <div className={`text-xl font-black ${isQuitado ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  {isQuitado ? 'QUITADO' : `R$ ${restante.toFixed(2)}`}
+                </div>
+              </div>
             </div>
 
-            <div className="p-6">
-              {forma === 'Dinheiro' && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs font-mono text-slate-400">VALOR RECEBIDO (R$):</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={recebido}
-                        onChange={e => setRecebido(parseFloat(e.target.value) || 0)}
-                        className="w-full p-3 bg-slate-950 border border-slate-700 rounded-xl text-2xl font-bold text-white font-mono mt-1"
-                      />
-                    </div>
-                    <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex flex-col justify-center">
-                      <span className="text-xs font-mono text-slate-400">TROCO:</span>
-                      <span className={`text-3xl font-extrabold font-mono mt-1 ${troco > 0 ? 'text-amber-400' : 'text-slate-400'}`}>
-                        R$ {troco.toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
+            <div className="p-6 flex-1 overflow-y-auto space-y-4">
+              {/* Identificação de Cliente */}
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex gap-3 text-xs font-mono">
+                <input
+                  type="text"
+                  placeholder="Nome do Cliente (opcional no cupom)"
+                  value={clienteNome}
+                  onChange={e => setClienteNome(e.target.value)}
+                  className="flex-1 p-2 bg-slate-900 border border-slate-700 rounded-lg text-white"
+                />
+                <input
+                  type="text"
+                  placeholder="CPF / CNPJ"
+                  value={clienteDoc}
+                  onChange={e => setClienteDoc(e.target.value)}
+                  className="w-48 p-2 bg-slate-900 border border-slate-700 rounded-lg text-white"
+                />
+              </div>
 
-                  <div className="flex gap-2">
-                    {[10, 20, 50, 100].map(val => (
+              {/* Botões de Formas */}
+              {!isQuitado && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-4 gap-2 font-mono text-xs">
+                    {['Dinheiro', 'Pix', 'CartaoCredito', 'CartaoDebito'].map(f => (
                       <button
-                        key={val}
-                        onClick={() => setRecebido(val >= total ? val : recebido + val)}
-                        className="px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded text-xs font-mono text-slate-300"
+                        key={f}
+                        onClick={() => setForma(f)}
+                        className={`p-2.5 rounded-xl font-bold border transition ${forma === f ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-slate-800 text-slate-400 border-slate-700'}`}
                       >
-                        + R$ {val}
+                        {f === 'CartaoCredito' ? '💳 Crédito' : f === 'CartaoDebito' ? '💳 Débito' : f === 'Pix' ? '⚡ Pix' : '💵 Dinheiro'}
                       </button>
                     ))}
                   </div>
-                </div>
-              )}
 
-              {forma === 'Pix' && (
-                <div className="text-center space-y-3">
-                  <div className="inline-block p-4 bg-white rounded-2xl">
-                    <svg viewBox="0 0 200 200" width="160" height="160">
-                      <rect width="200" height="200" fill="white"/>
-                      <rect x="20" y="20" width="40" height="40" fill="black"/>
-                      <rect x="25" y="25" width="30" height="30" fill="white"/>
-                      <rect x="30" y="30" width="20" height="20" fill="black"/>
-                      <rect x="140" y="20" width="40" height="40" fill="black"/>
-                      <rect x="145" y="25" width="30" height="30" fill="white"/>
-                      <rect x="150" y="30" width="20" height="20" fill="black"/>
-                      <rect x="20" y="140" width="40" height="40" fill="black"/>
-                      <rect x="25" y="145" width="30" height="30" fill="white"/>
-                      <rect x="30" y="150" width="20" height="20" fill="black"/>
-                      <rect x="85" y="85" width="30" height="30" fill="#00bdae"/>
-                      <text x="100" y="185" font-size="10" text-anchor="middle">R$ {total.toFixed(2)}</text>
-                    </svg>
+                  <div className="grid grid-cols-2 gap-3 font-mono">
+                    <div>
+                      <label className="text-xs text-slate-400">Valor Desta Parcela (R$):</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        max={restante}
+                        value={valorParcela}
+                        onChange={e => setValorParcela(Math.min(restante, parseFloat(e.target.value) || 0))}
+                        className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-xl text-lg font-bold text-white mt-1"
+                      />
+                    </div>
+                    {forma === 'Dinheiro' && (
+                      <div>
+                        <label className="text-xs text-slate-400">Dinheiro Entregue (Troco):</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={dinheiroEntregue}
+                          onChange={e => setDinheiroEntregue(parseFloat(e.target.value) || 0)}
+                          className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-xl text-lg font-bold text-white mt-1"
+                        />
+                      </div>
+                    )}
                   </div>
-                  <p className="text-xs text-slate-400 font-mono">Aguardando confirmação bancária do Pix...</p>
+
+                  {forma === 'Dinheiro' && trocoCalculado > 0 && (
+                    <div className="p-2.5 bg-amber-950/60 border border-amber-800 rounded-xl text-amber-300 font-mono text-xs flex justify-between font-bold">
+                      <span>TROCO NESTA PARCELA:</span>
+                      <span className="text-base">R$ {trocoCalculado.toFixed(2)}</span>
+                    </div>
+                  )}
+
                   <button
-                    onClick={() => { setPixSimulado(true); onSucesso({ forma: 'Pix', valor: total, troco: 0 }); }}
-                    className="px-4 py-2 bg-sky-950 hover:bg-sky-900 border border-sky-800 text-sky-300 rounded-xl text-xs font-mono font-bold"
+                    onClick={lancar}
+                    className="w-full py-2.5 bg-sky-600 hover:bg-sky-500 font-mono font-bold text-white rounded-xl text-xs"
                   >
-                    ⚡ Simular Pagamento Pix Instantâneo
+                    + Adicionar Parcela de R$ {valorParcela.toFixed(2)} no {forma}
                   </button>
                 </div>
               )}
 
-              {(forma === 'CartaoCredito' || forma === 'CartaoDebito') && (
-                <div className="text-center py-8 text-slate-400">
-                  <p className="text-base font-bold text-slate-200">Aproxime ou insira o cartão na máquina POS</p>
-                  <p className="text-xs mt-1">Aguarde aprovação e clique em confirmar.</p>
-                </div>
-              )}
+              {/* Lista de Parcelas */}
+              <div>
+                <h4 className="text-xs font-mono font-bold text-slate-400 uppercase mb-2">Parcelas Confirmadas:</h4>
+                {pagamentosLancados.length === 0 ? (
+                  <p className="text-xs text-slate-600 font-mono">Nenhum pagamento lançado ainda.</p>
+                ) : (
+                  <div className="space-y-1.5 font-mono text-xs">
+                    {pagamentosLancados.map((p, idx) => (
+                      <div key={idx} className="p-2.5 bg-slate-950 rounded-xl border border-slate-800 flex justify-between items-center">
+                        <span>• {p.forma} {p.troco > 0 ? `(Troco R$ ${p.troco.toFixed(2)})` : ''}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-emerald-400 font-bold">R$ {p.valor.toFixed(2)}</span>
+                          <button onClick={() => setPagamentosLancados(prev => prev.filter((_, i) => i !== idx))} className="text-red-400 font-bold ml-2">✕</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="p-4 bg-slate-950 border-t border-slate-800 flex justify-between">
-              <button onClick={onClose} className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-sm font-mono">[Esc] Cancelar</button>
+            <div className="p-4 bg-slate-950 border-t border-slate-800 flex justify-between font-mono">
+              <button onClick={onClose} className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-xs">[Esc] Cancelar</button>
               <button
-                disabled={forma === 'Dinheiro' && recebido < total}
-                onClick={() => onSucesso({ forma, valor: forma === 'Dinheiro' ? recebido : total, troco: forma === 'Dinheiro' ? troco : 0 })}
-                className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-slate-950 font-bold rounded-xl text-sm font-mono"
+                disabled={!isQuitado}
+                onClick={() => onSucesso(pagamentosLancados, { nome: clienteNome, doc: clienteDoc })}
+                className={`px-6 py-2.5 rounded-xl font-bold text-xs ${isQuitado ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950' : 'bg-slate-800 text-slate-600 cursor-not-allowed'}`}
               >
-                Confirmar Venda (Enter)
+                {isQuitado ? 'Confirmar e Fechar Venda (Enter)' : `Falta lançar R$ ${restante.toFixed(2)}`}
               </button>
             </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- MODAL IMPORTADOR AVANÇADO (IA + XML NF-e - PDVOpen) ---
+    function ModalImportadorAvancadoComponent({ onClose, onImportarNovosProdutos }) {
+      const [modo, setModo] = useState('xml');
+
+      return (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl p-6 font-sans space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <h3 className="font-bold text-white text-base">Central de Importação: NF-e XML & IA</h3>
+              <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
+            </div>
+
+            <div className="flex gap-2 font-mono text-xs">
+              <button onClick={() => setModo('xml')} className={`flex-1 py-2 rounded-lg font-bold ${modo === 'xml' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'}`}>
+                📄 Nota Fiscal XML (NF-e Fornecedor - PDVOpen)
+              </button>
+              <button onClick={() => setModo('ia')} className={`flex-1 py-2 rounded-lg font-bold ${modo === 'ia' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'}`}>
+                ✨ Planilha Inteligente com IA
+              </button>
+            </div>
+
+            {modo === 'xml' ? (
+              <div className="space-y-3 font-mono text-xs">
+                <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-1">
+                  <div className="font-bold text-sky-400">Entrada Rápida de Estoque por XML de NF-e:</div>
+                  <p className="text-slate-400">Lê automaticamente código GTIN/EAN, nome do produto, NCM, quantidade de entrada e preço de custo, calculando o preço de venda sugerido com base no markup.</p>
+                </div>
+
+                <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl">
+                  <span className="text-slate-400 font-bold block mb-1">Itens Identificados no XML da NF-e #00012485:</span>
+                  <div className="space-y-1 text-slate-300">
+                    <div className="flex justify-between">• Leite Condensado Moça 395g (+50 un) ➔ Custo: R$ 5.20 | Venda: R$ 7.80</div>
+                    <div className="flex justify-between">• Arroz Tio João 5kg (+30 un) ➔ Custo: R$ 21.80 | Venda: R$ 29.90</div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => {
+                    onImportarNovosProdutos([
+                      { id: '15', codigoBarras: '7891000100103', nome: 'Leite Condensado Moça 395g', preco: 7.80, estoque: 50, unidade: 'UN' },
+                      { id: '16', codigoBarras: '7898000000000', nome: 'Arroz Tio João 5kg', preco: 29.90, estoque: 30, unidade: 'UN' }
+                    ]);
+                  }}
+                  className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 font-bold text-slate-950 rounded-xl text-sm"
+                >
+                  Dar Entrada em Estoque da NF-e no Banco Local
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3 font-mono text-xs">
+                <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-400">
+                  A IA analisa cabeçalhos desconhecidos e correlaciona as colunas automaticamente com suporte a arquivos CSV e Excel.
+                </div>
+                <button
+                  onClick={() => {
+                    onImportarNovosProdutos([
+                      { id: '17', codigoBarras: '7891000200000', nome: 'Achocolatado Nescau 400g', preco: 8.90, estoque: 45, unidade: 'UN' }
+                    ]);
+                  }}
+                  className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 font-bold text-white rounded-xl text-sm"
+                >
+                  Confirmar Importação de Planilha via IA
+                </button>
+              </div>
+            )}
           </div>
         </div>
       );
@@ -682,7 +964,9 @@
                 >
                   <div>
                     <span className="font-bold text-slate-200">{p.nome}</span>
-                    <span className="block text-xs text-slate-500 font-mono">{p.codigoBarras} • Estoque: {p.estoque} un</span>
+                    <span className="block text-xs text-slate-500 font-mono">
+                      {p.codigoBarras} • Estoque: {p.estoque} {p.unidade} {p.unidade === 'KG' ? '(Balança)' : ''}
+                    </span>
                   </div>
                   <span className="text-emerald-400 font-bold font-mono">R$ {p.preco.toFixed(2)}</span>
                 </div>
@@ -750,40 +1034,7 @@
       );
     }
 
-    function ModalImportadorComponent({ onClose, onImportarNovosProdutos }) {
-      return (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-xl bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl p-6 font-sans space-y-4">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-              <h3 className="font-bold text-white">📊 Importador Inteligente por IA (F4)</h3>
-              <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
-            </div>
-            <p className="text-xs text-slate-400">A IA lê os cabeçalhos de planilhas Excel/CSV e detecta automaticamente código de barras, descrição, preço de venda e estoque.</p>
-
-            <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl space-y-2 font-mono text-xs text-slate-300">
-              <div className="text-emerald-400 font-bold">✨ Mapeamento Sugerido pela IA (Gemini):</div>
-              <div>• Código de Barras ➔ coluna 'codigo_barras' (100% confiança)</div>
-              <div>• Nome do Produto ➔ coluna 'descricao_item' (98% confiança)</div>
-              <div>• Preço de Venda ➔ coluna 'preco_unitario' (95% confiança)</div>
-            </div>
-
-            <button
-              onClick={() => {
-                onImportarNovosProdutos([
-                  { id: '10', codigoBarras: '7891000200000', nome: 'Achocolatado Nescau 400g', preco: 8.90, estoque: 45 },
-                  { id: '11', codigoBarras: '7892000300000', nome: 'Detergente Ypê Neutro 500ml', preco: 2.50, estoque: 100 }
-                ]);
-              }}
-              className="w-full p-3 bg-indigo-600 hover:bg-indigo-500 font-bold text-white rounded-xl font-mono text-sm"
-            >
-              Confirmar Importação de 2 Produtos de Teste
-            </button>
-          </div>
-        </div>
-      );
-    }
-
-    function ModalCupomComponent({ venda, onClose }) {
+    function ModalCupomAvancadoComponent({ venda, onClose }) {
       return (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="w-full max-w-sm bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl flex flex-col font-sans">
@@ -800,16 +1051,22 @@
                   <div className="text-[10px] font-bold mt-1">*** CUPOM NÃO FISCAL ***</div>
                 </div>
 
-                <div className="text-[10px] border-b border-dashed border-slate-400 pb-2 mb-2">
+                <div className="text-[10px] border-b border-dashed border-slate-400 pb-2 mb-2 space-y-0.5">
                   <div>Venda: #{venda.id}</div>
                   <div>Data: {new Date().toLocaleString()}</div>
                   <div>Operador: {venda.operador}</div>
+                  {venda.clienteNome && (
+                    <div className="pt-1 text-slate-700 font-semibold border-t border-slate-200">
+                      <div>Cliente: {venda.clienteNome}</div>
+                      {venda.clienteDoc && <div>Doc: {venda.clienteDoc}</div>}
+                    </div>
+                  )}
                 </div>
 
                 <div className="border-b border-dashed border-slate-400 pb-2 mb-2 text-[10px]">
                   {venda.itens.map((it, idx) => (
                     <div key={idx} className="flex justify-between my-0.5">
-                      <span>{it.qtd}x {it.nome.slice(0, 18)}</span>
+                      <span>{it.unidade === 'KG' ? `${it.qtd.toFixed(3)}kg` : `${it.qtd}x`} {it.nome.slice(0, 16)}</span>
                       <span>R$ {it.subtotal.toFixed(2)}</span>
                     </div>
                   ))}
@@ -820,16 +1077,22 @@
                     <span>TOTAL:</span>
                     <span>R$ {venda.total.toFixed(2)}</span>
                   </div>
-                  <div className="text-[10px] mt-1 flex justify-between">
-                    <span>FORMA: {venda.pagamento.forma}</span>
-                    <span>R$ {venda.pagamento.valor.toFixed(2)}</span>
+
+                  <div className="text-[10px] mt-1 space-y-0.5 border-t border-slate-200 pt-1">
+                    <div className="font-bold">Pagamento(s):</div>
+                    {venda.pagamentos.map((p, idx) => (
+                      <div key={idx} className="flex justify-between">
+                        <span>• {p.forma}:</span>
+                        <span>R$ {p.valor.toFixed(2)}</span>
+                      </div>
+                    ))}
+                    {venda.pagamentos.some(p => p.troco > 0) && (
+                      <div className="flex justify-between font-bold text-slate-800 pt-0.5 border-t border-slate-200">
+                        <span>TROCO DEVOLVIDO:</span>
+                        <span>R$ {venda.pagamentos.find(p => p.troco > 0)?.troco.toFixed(2)}</span>
+                      </div>
+                    )}
                   </div>
-                  {venda.pagamento.troco > 0 && (
-                    <div className="text-[10px] flex justify-between font-bold">
-                      <span>TROCO:</span>
-                      <span>R$ {venda.pagamento.troco.toFixed(2)}</span>
-                    </div>
-                  )}
                 </div>
 
                 <div className="text-center text-[10px] text-slate-600 pt-1">

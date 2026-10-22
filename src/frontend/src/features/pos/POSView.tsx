@@ -10,6 +10,9 @@ import {
   FileSpreadsheet,
   AlertTriangle,
   RotateCcw,
+  Plus,
+  X,
+  User,
 } from 'lucide-react';
 import { CartTable } from './components/CartTable';
 import { PaymentModal } from './components/PaymentModal';
@@ -21,6 +24,7 @@ import { useCashierStore } from '../../store/useCashierStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { pdvApi } from '../../services/api';
 import { sound } from '../../services/sound';
+import { decodificarCodigoBarras } from '../../utils/barcodeParser';
 import { Venda } from '../../types';
 
 interface POSViewProps {
@@ -38,14 +42,37 @@ export const POSView: React.FC<POSViewProps> = ({ onAbrirImportador }) => {
   const [isCashierOpen, setIsCashierOpen] = useState(false);
   const [vendaFinalizada, setVendaFinalizada] = useState<Venda | null>(null);
 
-  // Stores
-  const { itens, adicionarProduto, removerItemSelecionado, incrementarQuantidade, selectedItemId, getTotalBruto, getTotalLiquido, getTotalItens, desconto, setDesconto, limparCarrinho } = useCartStore();
+  // Store com suporte a Multi-Abas (PDVOpen)
+  const {
+    abas,
+    abaAtivaId,
+    criarNovaAba,
+    fecharAba,
+    alternarAba,
+    alternarPorIndice,
+    getAbaAtiva,
+    getItens,
+    getTotalBruto,
+    getTotalLiquido,
+    getTotalItens,
+    getDesconto,
+    adicionarProduto,
+    removerItemSelecionado,
+    incrementarQuantidade,
+    selectedItemId,
+    setDesconto,
+    limparCarrinhoAbaAtual,
+  } = useCartStore();
+
+  const abaAtiva = getAbaAtiva();
+  const itens = getItens();
+  const desconto = getDesconto();
+
   const { caixa, carregarCaixa } = useCashierStore();
   const operador = useAuthStore(state => state.operador);
 
   const barcodeInputRef = useRef<HTMLInputElement>(null);
 
-  // Inicializa o caixa
   useEffect(() => {
     carregarCaixa();
   }, [carregarCaixa]);
@@ -62,10 +89,29 @@ export const POSView: React.FC<POSViewProps> = ({ onAbrirImportador }) => {
     return () => clearInterval(interval);
   }, [isPaymentOpen, isSearchOpen, isCashierOpen, vendaFinalizada]);
 
-  // Ouvinte global de atalhos de teclado (F1 a F4, Del, +, -, Esc)
+  // Atalhos de teclado (F1 a F4, Del, +, -, Esc, Ctrl+T, Ctrl+W, Ctrl+1..5)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Se algum modal estiver aberto, deixa o modal tratar o Esc
+      // Atalhos de abas com Ctrl
+      if (e.ctrlKey) {
+        if (e.key === 't' || e.key === 'T') {
+          e.preventDefault();
+          criarNovaAba();
+          return;
+        }
+        if (e.key === 'w' || e.key === 'W') {
+          e.preventDefault();
+          fecharAba(abaAtivaId);
+          return;
+        }
+        const num = parseInt(e.key, 10);
+        if (!isNaN(num) && num >= 1 && num <= 9) {
+          e.preventDefault();
+          alternarPorIndice(num - 1);
+          return;
+        }
+      }
+
       if (isPaymentOpen || isSearchOpen || isCashierOpen || vendaFinalizada) {
         if (e.key === 'Escape') {
           setIsPaymentOpen(false);
@@ -129,8 +175,8 @@ export const POSView: React.FC<POSViewProps> = ({ onAbrirImportador }) => {
         case 'Escape':
           e.preventDefault();
           if (itens.length > 0) {
-            if (window.confirm('Deseja realmente cancelar a venda atual e limpar o carrinho?')) {
-              limparCarrinho();
+            if (window.confirm('Deseja realmente limpar a venda atual?')) {
+              limparCarrinhoAbaAtual();
             }
           }
           break;
@@ -139,9 +185,9 @@ export const POSView: React.FC<POSViewProps> = ({ onAbrirImportador }) => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isPaymentOpen, isSearchOpen, isCashierOpen, vendaFinalizada, itens, caixa, selectedItemId, removerItemSelecionado, incrementarQuantidade, limparCarrinho, onAbrirImportador]);
+  }, [isPaymentOpen, isSearchOpen, isCashierOpen, vendaFinalizada, itens, caixa, selectedItemId, removerItemSelecionado, incrementarQuantidade, limparCarrinhoAbaAtual, onAbrirImportador, abaAtivaId, criarNovaAba, fecharAba, alternarPorIndice]);
 
-  // Leitura do Código de Barras e Multiplicação (Ex: 3*789...)
+  // Processamento do Código de Barras (Suporta multiplicação '3*cod' e código de balança EAN-13 iniciando com '2')
   const handleCodigoSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErroMsg(null);
@@ -157,6 +203,7 @@ export const POSView: React.FC<POSViewProps> = ({ onAbrirImportador }) => {
     let quantidade = 1;
     let codigo = entrada;
 
+    // Multiplicação manual (ex: 3*789... ou 0.450*789...)
     if (entrada.includes('*')) {
       const partes = entrada.split('*');
       const qtdParse = parseFloat(partes[0].replace(',', '.'));
@@ -166,6 +213,26 @@ export const POSView: React.FC<POSViewProps> = ({ onAbrirImportador }) => {
       }
     }
 
+    // Decodificador de Balança EAN-13 iniciando com '2' (PDVOpen)
+    const balancaResult = decodificarCodigoBarras(codigo);
+    if (balancaResult.isBalanca) {
+      try {
+        const produto = await pdvApi.buscarProdutoPorCodigo(balancaResult.codigoProduto);
+        if (produto) {
+          // Se o valor foi embutido, calcula a quantidade fracionada em kg
+          if (balancaResult.tipoEmbutido === 'preco' && balancaResult.valorOuPesoEmbutido) {
+            const pesoCalculado = parseFloat((balancaResult.valorOuPesoEmbutido / produto.precoVenda).toFixed(3));
+            adicionarProduto(produto, pesoCalculado, 'KG');
+            setCodigoInput('');
+            return;
+          }
+        }
+      } catch {
+        // Fallback para busca normal
+      }
+    }
+
+    // Busca padrão de produto
     try {
       const produto = await pdvApi.buscarProdutoPorCodigo(codigo);
       if (produto) {
@@ -190,7 +257,7 @@ export const POSView: React.FC<POSViewProps> = ({ onAbrirImportador }) => {
 
   return (
     <div className="flex-1 flex flex-col h-screen overflow-hidden bg-slate-950 font-sans">
-      {/* 1. Barra Superior de Status e Atalhos */}
+      {/* 1. Barra Superior de Status */}
       <header className="h-14 bg-slate-900 border-b border-slate-800 px-4 flex items-center justify-between select-none">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
@@ -227,7 +294,64 @@ export const POSView: React.FC<POSViewProps> = ({ onAbrirImportador }) => {
         </div>
       </header>
 
-      {/* 2. Área Principal de Venda (Lado Esquerdo 2/3 e Lado Direito 1/3) */}
+      {/* 2. BARRA DE MÚLTIPLAS ABAS DE ATENDIMENTO (PDVOpen Multi-Vendas) */}
+      <div className="bg-slate-900/90 border-b border-slate-800 px-3 py-1.5 flex items-center gap-2 overflow-x-auto select-none">
+        <span className="text-[11px] font-mono font-bold text-slate-500 uppercase mr-1">Vendas:</span>
+        {abas.map((aba, index) => {
+          const isAtiva = aba.id === abaAtivaId;
+          const totalAba = aba.itens.reduce((acc, i) => acc + i.subtotal, 0);
+
+          return (
+            <div
+              key={aba.id}
+              onClick={() => alternarAba(aba.id)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold flex items-center gap-2 cursor-pointer transition border ${
+                isAtiva
+                  ? 'bg-emerald-600 text-white border-emerald-500 shadow-md shadow-emerald-950/50'
+                  : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:bg-slate-800 hover:text-slate-200'
+              }`}
+            >
+              <span>{index + 1}. {aba.titulo}</span>
+              {totalAba > 0 && (
+                <span className={`text-[10px] px-1.5 py-0.2 rounded ${isAtiva ? 'bg-emerald-700 text-white' : 'bg-slate-700 text-slate-300'}`}>
+                  R$ {totalAba.toFixed(2)}
+                </span>
+              )}
+              {abas.length > 1 && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    fecharAba(aba.id);
+                  }}
+                  className="hover:text-red-300 rounded p-0.5 ml-0.5"
+                  title="Fechar aba (Ctrl+W)"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+          );
+        })}
+
+        <button
+          onClick={() => criarNovaAba()}
+          title="Abrir nova venda em espera (Ctrl+T)"
+          className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white text-xs font-mono font-bold flex items-center gap-1 transition"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span>Nova Venda</span>
+          <kbd className="text-[10px] text-slate-500 bg-slate-900 px-1 rounded">Ctrl+T</kbd>
+        </button>
+
+        {abaAtiva.clienteNome && (
+          <div className="ml-auto text-xs font-mono text-sky-400 flex items-center gap-1.5 bg-sky-950/60 px-2.5 py-1 rounded-lg border border-sky-800">
+            <User className="w-3.5 h-3.5" />
+            <span>Cliente: <strong>{abaAtiva.clienteNome}</strong></span>
+          </div>
+        )}
+      </div>
+
+      {/* 3. Área Principal de Venda (Lado Esquerdo 2/3 e Lado Direito 1/3) */}
       <div className="flex-1 flex overflow-hidden p-3 gap-3">
         {/* LADO ESQUERDO (2/3 da Tela): Busca por Código de Barras e Tabela do Carrinho */}
         <section className="flex-[2] flex flex-col gap-3 min-w-0">
@@ -238,7 +362,7 @@ export const POSView: React.FC<POSViewProps> = ({ onAbrirImportador }) => {
               <input
                 ref={barcodeInputRef}
                 type="text"
-                placeholder="Passe o código de barras ou digite a quantidade*código (Ex: 3*789...)"
+                placeholder="Passe o leitor, digite código ou 3*código (Balança EAN-13 aceito automaticamente)..."
                 value={codigoInput}
                 onChange={e => setCodigoInput(e.target.value)}
                 className="w-full pl-14 pr-28 py-3.5 bg-slate-900/90 border-2 border-slate-700 rounded-2xl text-xl font-mono font-bold text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 shadow-lg shadow-black/40 tracking-wider"
@@ -291,14 +415,14 @@ export const POSView: React.FC<POSViewProps> = ({ onAbrirImportador }) => {
 
               <div className="flex justify-between items-center text-xs text-slate-500 border-t border-slate-800 pt-2">
                 <span>TOTAL DE ITENS:</span>
-                <span className="font-bold text-slate-400">{getTotalItens()} un</span>
+                <span className="font-bold text-slate-400">{getTotalItens()}</span>
               </div>
             </div>
 
             {/* Total Líquido em Destaque Gigante */}
             <div className="mt-4 pt-4 border-t-2 border-dashed border-slate-800 text-right">
               <span className="text-xs text-emerald-400 font-mono tracking-widest font-bold uppercase block mb-1">
-                VALOR TOTAL LÍQUIDO
+                VALOR TOTAL LÍQUIDO ({abaAtiva.titulo})
               </span>
               <div className="text-4xl lg:text-5xl font-black font-mono text-emerald-400 tracking-tight drop-shadow-[0_2px_10px_rgba(16,185,129,0.3)]">
                 R$ {getTotalLiquido().toFixed(2)}
@@ -352,7 +476,7 @@ export const POSView: React.FC<POSViewProps> = ({ onAbrirImportador }) => {
               >
                 <div className="flex items-center gap-2">
                   <FileSpreadsheet className="w-4 h-4 text-indigo-400" />
-                  <span>IMPORTADOR PLANILHA IA</span>
+                  <span>IMPORTAÇÃO IA & XML</span>
                 </div>
                 <kbd className="px-2 py-0.5 rounded bg-indigo-900 text-indigo-300 font-mono text-xs">F4</kbd>
               </button>
@@ -360,15 +484,15 @@ export const POSView: React.FC<POSViewProps> = ({ onAbrirImportador }) => {
 
             <button
               onClick={() => {
-                if (itens.length > 0 && window.confirm('Deseja realmente cancelar a venda atual?')) {
-                  limparCarrinho();
+                if (itens.length > 0 && window.confirm('Deseja realmente limpar os itens desta venda?')) {
+                  limparCarrinhoAbaAtual();
                 }
               }}
               className="w-full py-2.5 px-3 rounded-xl bg-slate-800/60 hover:bg-red-950/50 hover:text-red-400 border border-slate-700/60 text-slate-400 text-xs font-mono font-bold flex items-center justify-between transition"
             >
               <div className="flex items-center gap-2">
                 <RotateCcw className="w-3.5 h-3.5" />
-                <span>CANCELAR VENDA</span>
+                <span>LIMPAR CARRINHO</span>
               </div>
               <kbd className="px-1.5 py-0.5 rounded bg-slate-700 text-slate-300 font-mono text-[10px]">Esc</kbd>
             </button>

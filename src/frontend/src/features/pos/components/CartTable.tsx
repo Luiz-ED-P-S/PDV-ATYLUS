@@ -3,18 +3,21 @@ import { Trash2, Plus, Minus, ShoppingCart } from 'lucide-react';
 import { useCartStore } from '../../../store/useCartStore';
 
 export const CartTable: React.FC = () => {
-  const { itens, selectedItemId, selecionarItem, incrementarQuantidade, removerItem } = useCartStore();
+  const { getItens, getSelectedItemId, selecionarItem, incrementarQuantidade, removerItem } = useCartStore();
+  const itens = getItens();
+  const selectedItemId = getSelectedItemId();
 
   if (itens.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-slate-800 rounded-xl bg-slate-900/40 text-slate-500 p-8">
         <ShoppingCart className="w-16 h-16 text-slate-700 mb-3 animate-pulse" />
-        <h3 className="text-xl font-bold text-slate-400">Caixa Livre / Carrinho Vazio</h3>
+        <h3 className="text-xl font-bold text-slate-400">Caixa Livre / Venda sem Itens</h3>
         <p className="text-sm mt-1 text-slate-500 text-center max-w-sm">
-          Passe o produto no leitor de código de barras ou pressione <kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-emerald-400 font-mono text-xs">F2</kbd> para buscar pelo nome.
+          Passe o produto no leitor de código de barras ou pressione <kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-emerald-400 font-mono text-xs">F2</kbd> para buscar.
         </p>
-        <div className="mt-4 flex gap-4 text-xs text-slate-600 font-mono">
-          <span>Dica: Digite <strong className="text-slate-400">3*789...</strong> para adicionar 3 unidades</span>
+        <div className="mt-4 flex flex-col gap-1 text-xs text-slate-600 font-mono text-center">
+          <span>• Dica: Digite <strong className="text-slate-400">3*código</strong> para 3 unidades</span>
+          <span>• Balança: Digite <strong className="text-slate-400">0.450*código</strong> para 450 gramas</span>
         </div>
       </div>
     );
@@ -30,7 +33,7 @@ export const CartTable: React.FC = () => {
               <th className="py-3 px-3 w-36">Cód. Barras</th>
               <th className="py-3 px-3">Descrição do Produto</th>
               <th className="py-3 px-3 w-28 text-right">Unitário</th>
-              <th className="py-3 px-3 w-36 text-center">Qtd.</th>
+              <th className="py-3 px-3 w-40 text-center">Qtd / Peso</th>
               <th className="py-3 px-3 w-32 text-right">Subtotal</th>
               <th className="py-3 px-3 w-14 text-center">Ações</th>
             </tr>
@@ -38,6 +41,7 @@ export const CartTable: React.FC = () => {
           <tbody className="divide-y divide-slate-800/60 font-mono">
             {itens.map((item, index) => {
               const isSelected = item.id === selectedItemId;
+              const isKg = item.unidadeMedida === 'KG';
 
               return (
                 <tr
@@ -57,6 +61,11 @@ export const CartTable: React.FC = () => {
                   </td>
                   <td className="py-3 px-3 font-sans font-medium text-slate-200">
                     {item.nome}
+                    {isKg && (
+                      <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-amber-950/80 text-amber-300 border border-amber-800 font-mono">
+                        KG
+                      </span>
+                    )}
                   </td>
                   <td className="py-3 px-3 text-right font-mono text-slate-300">
                     R$ {item.precoUnitario.toFixed(2)}
@@ -70,8 +79,8 @@ export const CartTable: React.FC = () => {
                       >
                         <Minus className="w-3.5 h-3.5" />
                       </button>
-                      <span className="w-10 text-center font-bold text-white text-base">
-                        {item.quantidade}
+                      <span className="w-14 text-center font-bold text-white text-sm">
+                        {isKg ? `${item.quantidade.toFixed(3)} kg` : item.quantidade}
                       </span>
                       <button
                         title="Aumentar quantidade (+)"

@@ -2,6 +2,8 @@ export type FormaPagamento = 'Dinheiro' | 'Pix' | 'CartaoCredito' | 'CartaoDebit
 
 export type StatusCaixa = 'Aberto' | 'Fechado';
 
+export type TipoUnidade = 'UN' | 'KG' | 'LT' | 'CX';
+
 export interface Produto {
   id: string;
   codigoBarras: string;
@@ -10,6 +12,7 @@ export interface Produto {
   precoCusto: number;
   estoqueAtual: number;
   estoqueMinimo: number;
+  unidadeMedida?: TipoUnidade;
   ativo: boolean;
 }
 
@@ -19,11 +22,13 @@ export interface ItemCarrinho {
   nome: string;
   codigoBarras: string;
   quantidade: number;
+  unidadeMedida?: TipoUnidade;
   precoUnitario: number;
   subtotal: number;
 }
 
 export interface PagamentoItem {
+  id: string;
   forma: FormaPagamento;
   valor: number;
   troco?: number;
@@ -55,6 +60,8 @@ export interface Venda {
   id: string;
   caixaId: string;
   operadorId: string;
+  clienteNome?: string;
+  clienteDocumento?: string;
   dataVenda: string;
   valorTotal: number;
   desconto: number;
@@ -65,6 +72,7 @@ export interface Venda {
     produtoNome: string;
     codigoBarras: string;
     quantidade: number;
+    unidadeMedida?: TipoUnidade;
     precoUnitario: number;
     subtotal: number;
   }[];
@@ -74,6 +82,18 @@ export interface Venda {
     troco: number;
     txId?: string;
   }[];
+}
+
+export interface AbaAtendimento {
+  id: string;
+  numero: number;
+  titulo: string;
+  clienteNome?: string;
+  clienteDocumento?: string;
+  itens: ItemCarrinho[];
+  selectedItemId: string | null;
+  desconto: number;
+  criadaEm: string;
 }
 
 export interface PixGenerateResult {
@@ -92,4 +112,17 @@ export interface MapeamentoColunas {
   colunaEstoque: string | null;
   confianca: number;
   observacoes: string | null;
+}
+
+export interface NfeXmlProdutoItem {
+  codigoProduto: string;
+  codigoBarras: string;
+  descricao: string;
+  ncm: string;
+  unidadeComercial: string;
+  quantidade: number;
+  valorUnitario: number;
+  valorTotal: number;
+  margemSugeridaPercentual: number;
+  precoVendaSugerido: number;
 }
