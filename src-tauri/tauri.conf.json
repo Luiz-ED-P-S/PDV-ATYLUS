@@ -1,0 +1,62 @@
+{
+  "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/tooling/cli/schema.json",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devPath": "http://localhost:5173",
+    "distDir": "../dist"
+  },
+  "package": {
+    "productName": "HorusAtylusPDV",
+    "version": "1.0.0"
+  },
+  "tauri": {
+    "allowlist": {
+      "all": true,
+      "fs": {
+        "all": true,
+        "scope": ["$APPDATA/*", "$RESOURCE/*"]
+      },
+      "shell": {
+        "all": true,
+        "execute": true,
+        "open": true
+      },
+      "window": {
+        "all": true,
+        "close": true,
+        "hide": true,
+        "maximize": true,
+        "minimize": true,
+        "print": true,
+        "show": true,
+        "unmaximize": true,
+        "unminimize": true
+      }
+    },
+    "bundle": {
+      "active": true,
+      "category": "Business",
+      "copyright": "Hórus Atylus PDV 2026",
+      "identifier": "com.atylus.horuspdv",
+      "shortDescription": "Sistema de Frente de Caixa Moderno e Offline-First",
+      "targets": ["msi", "nsis"]
+    },
+    "security": {
+      "csp": null
+    },
+    "windows": [
+      {
+        "fullscreen": false,
+        "height": 900,
+        "resizable": true,
+        "title": "Hórus Atylus PDV",
+        "width": 1400,
+        "minHeight": 720,
+        "minWidth": 1024,
+        "decorations": false,
+        "transparent": false
+      }
+    ]
+  }
+}

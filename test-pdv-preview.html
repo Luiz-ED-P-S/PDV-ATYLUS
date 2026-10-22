@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PDV Atylus - Teste Interativo de Frente de Caixa (Inspirado no PDVOpen & Horus)</title>
+  <title>Hórus Atylus PDV - Aplicativo Desktop (Frente de Caixa)</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- React & ReactDOM CDN -->
@@ -17,13 +17,16 @@
       theme: {
         extend: {
           colors: {
-            retail: {
-              dark: '#0a0f1d',
-              card: '#111827',
-              border: '#1f2937',
-              primary: '#10b981',
-              secondary: '#38bdf8',
-              accent: '#f59e0b',
+            horus: {
+              bg: '#0b1118',
+              card: '#111c26',
+              surface: '#162330',
+              border: '#1f3042',
+              accent: '#0284c7',
+              cyan: '#0ea5e9',
+              emerald: '#10b981',
+              amber: '#f59e0b',
+              rose: '#f43f5e',
             }
           }
         }
@@ -41,7 +44,7 @@
     }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-100 select-none overflow-hidden font-sans">
+<body class="bg-[#070c12] text-slate-100 select-none overflow-hidden font-sans">
   <div id="root"></div>
 
   <script type="text/babel">
@@ -109,19 +112,50 @@
     }
     const sound = new SoundManager();
 
-    // --- CATÁLOGO DE PRODUTOS DEMO (UNIDADE E QUILO/BALANÇA) ---
-    const PRODUTOS_DEMO = [
-      { id: '1', codigoBarras: '7894900010015', nome: 'Refrigerante Coca-Cola 2L', preco: 9.50, estoque: 50, unidade: 'UN' },
-      { id: '2', codigoBarras: '7891000100103', nome: 'Leite Integral Ninho 1L', preco: 5.80, estoque: 30, unidade: 'UN' },
-      { id: '3', codigoBarras: '7891910000197', nome: 'Açúcar Refinado União 1kg', preco: 4.20, estoque: 40, unidade: 'UN' },
-      { id: '4', codigoBarras: '7896004000153', nome: 'Café Torrado e Moído Pilão 500g', preco: 18.90, estoque: 25, unidade: 'UN' },
-      { id: '5', codigoBarras: '7891024131238', nome: 'Biscoito Recheado Passatempo 130g', preco: 3.20, estoque: 60, unidade: 'UN' },
-      { id: '10', codigoBarras: '10', codigoItemBalanca: '10', nome: 'Queijo Muçarela Fatiado (Balança)', preco: 49.90, estoque: 15.5, unidade: 'KG' },
-      { id: '20', codigoBarras: '20', codigoItemBalanca: '20', nome: 'Pão Francês Tradicional (Balança)', preco: 14.50, estoque: 20.0, unidade: 'KG' },
+    // --- PRODUTOS DEMO (UNIDADE E BALANÇA) ---
+    const PRODUTOS_INICIAIS = [
+      { id: '1', codigoBarras: '7894900010015', nome: 'Refrigerante Coca-Cola 2L', preco: 9.50, custo: 6.00, estoque: 50, unidade: 'UN' },
+      { id: '2', codigoBarras: '7891000100103', nome: 'Leite Integral Ninho 1L', preco: 5.80, custo: 3.90, estoque: 30, unidade: 'UN' },
+      { id: '3', codigoBarras: '7891910000197', nome: 'Açúcar Refinado União 1kg', preco: 4.20, custo: 2.70, estoque: 40, unidade: 'UN' },
+      { id: '4', codigoBarras: '7896004000153', nome: 'Café Torrado e Moído Pilão 500g', preco: 18.90, custo: 12.50, estoque: 25, unidade: 'UN' },
+      { id: '5', codigoBarras: '7891024131238', nome: 'Biscoito Recheado Passatempo 130g', preco: 3.20, custo: 1.80, estoque: 60, unidade: 'UN' },
+      { id: '10', codigoBarras: '10', codigoItemBalanca: '10', nome: 'Queijo Muçarela Fatiado (Balança)', preco: 49.90, custo: 32.00, estoque: 15.5, unidade: 'KG' },
+      { id: '20', codigoBarras: '20', codigoItemBalanca: '20', nome: 'Pão Francês Tradicional (Balança)', preco: 14.50, custo: 8.00, estoque: 20.0, unidade: 'KG' },
     ];
 
     function App() {
-      // Estado de Caixa
+      // Navegação por Módulos Estilo Hórus PDV
+      const [moduloAtivo, setModuloAtivo] = useState('pos'); // pos | products | sales | cashier | importer | settings
+      const [sidebarColapsada, setSidebarColapsada] = useState(false);
+
+      // Estado do Catálogo
+      const [produtos, setProdutos] = useState(PRODUTOS_INICIAIS);
+
+      // Estado de Vendas Realizadas
+      const [historicoVendas, setHistoricoVendas] = useState([
+        {
+          id: 'VND-001240',
+          dataVenda: new Date(Date.now() - 25 * 60000).toISOString(),
+          operador: 'Luiz Portella',
+          clienteNome: 'João Silva',
+          clienteDoc: '123.456.789-00',
+          subtotal: 54.80,
+          desconto: 5.00,
+          total: 49.80,
+          status: 'Concluida',
+          itens: [
+            { produtoId: '1', nome: 'Refrigerante Coca-Cola 2L', preco: 9.50, qtd: 2, unidade: 'UN', subtotal: 19.00 },
+            { produtoId: '4', nome: 'Café Torrado Pilão 500g', preco: 18.90, qtd: 1, unidade: 'UN', subtotal: 18.90 },
+            { produtoId: '10', nome: 'Queijo Muçarela Fatiado', preco: 49.90, qtd: 0.238, unidade: 'KG', subtotal: 11.90 }
+          ],
+          pagamentos: [
+            { forma: 'Dinheiro', valor: 20.00, troco: 0 },
+            { forma: 'Pix', valor: 29.80, troco: 0 }
+          ]
+        }
+      ]);
+
+      // Estado do Caixa
       const [caixaAberto, setCaixaAberto] = useState(true);
       const [saldoInicial, setSaldoInicial] = useState(100.00);
       const [movimentacoes, setMovimentacoes] = useState([
@@ -153,8 +187,7 @@
       const [modalPagamento, setModalPagamento] = useState(false);
       const [modalBusca, setModalBusca] = useState(false);
       const [modalCaixa, setModalCaixa] = useState(false);
-      const [modalImportador, setModalImportador] = useState(false);
-      const [vendaConcluida, setVendaConcluida] = useState(null);
+      const [vendaCupomParaImprimir, setVendaCupomParaImprimir] = useState(null);
 
       const barcodeInputRef = useRef(null);
 
@@ -165,62 +198,70 @@
 
       // Foco automático
       useEffect(() => {
-        if (!modalPagamento && !modalBusca && !modalCaixa && !modalImportador && !vendaConcluida) {
+        if (moduloAtivo === 'pos' && !modalPagamento && !modalBusca && !modalCaixa && !vendaCupomParaImprimir) {
           barcodeInputRef.current?.focus();
         }
-      }, [modalPagamento, modalBusca, modalCaixa, modalImportador, vendaConcluida, abaAtivaId]);
+      }, [moduloAtivo, modalPagamento, modalBusca, modalCaixa, vendaCupomParaImprimir, abaAtivaId]);
 
-      // Atalhos Globais (F1-F4, Del, +, -, Esc, Ctrl+T, Ctrl+W, Ctrl+1..5)
+      // Atalhos Globais de Teclado (F1-F4, Del, +, -, Esc, Ctrl+T, Ctrl+W, Ctrl+B, Ctrl+1..5)
       useEffect(() => {
         const onKeyDown = (e) => {
           if (e.ctrlKey) {
-            if (e.key === 't' || e.key === 'T') {
+            if (e.key === 'b' || e.key === 'B') {
               e.preventDefault();
-              criarNovaAba();
+              setSidebarColapsada(prev => !prev);
               return;
             }
-            if (e.key === 'w' || e.key === 'W') {
-              e.preventDefault();
-              fecharAba(abaAtivaId);
-              return;
-            }
-            const num = parseInt(e.key, 10);
-            if (!isNaN(num) && num >= 1 && num <= abas.length) {
-              e.preventDefault();
-              setAbaAtivaId(abas[num - 1].id);
-              sound.playScan();
-              return;
+            if (moduloAtivo === 'pos') {
+              if (e.key === 't' || e.key === 'T') {
+                e.preventDefault();
+                criarNovaAba();
+                return;
+              }
+              if (e.key === 'w' || e.key === 'W') {
+                e.preventDefault();
+                fecharAba(abaAtivaId);
+                return;
+              }
+              const num = parseInt(e.key, 10);
+              if (!isNaN(num) && num >= 1 && num <= abas.length) {
+                e.preventDefault();
+                setAbaAtivaId(abas[num - 1].id);
+                sound.playScan();
+                return;
+              }
             }
           }
 
-          if (modalPagamento || modalBusca || modalCaixa || modalImportador || vendaConcluida) {
+          if (modalPagamento || modalBusca || modalCaixa || vendaCupomParaImprimir) {
             if (e.key === 'Escape') {
               setModalPagamento(false);
               setModalBusca(false);
               setModalCaixa(false);
-              setModalImportador(false);
-              setVendaConcluida(null);
+              setVendaCupomParaImprimir(null);
             }
             return;
           }
 
           if (e.key === 'F1') {
             e.preventDefault();
+            setModuloAtivo('pos');
             if (itens.length > 0 && caixaAberto) setModalPagamento(true);
             else { sound.playError(); setErroMsg('Caixa fechado ou carrinho vazio.'); }
           } else if (e.key === 'F2') {
             e.preventDefault();
+            setModuloAtivo('pos');
             setModalBusca(true);
           } else if (e.key === 'F3') {
             e.preventDefault();
             setModalCaixa(true);
           } else if (e.key === 'F4') {
             e.preventDefault();
-            setModalImportador(true);
-          } else if (e.key === 'Delete') {
+            setModuloAtivo('importer');
+          } else if (e.key === 'Delete' && moduloAtivo === 'pos') {
             e.preventDefault();
             removerItem(selectedId);
-          } else if (e.key === 'Escape') {
+          } else if (e.key === 'Escape' && moduloAtivo === 'pos') {
             e.preventDefault();
             if (itens.length > 0 && confirm('Deseja limpar os itens desta venda?')) {
               atualizarAbaAtual({ itens: [], selectedId: null, desconto: 0 });
@@ -229,7 +270,7 @@
         };
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
-      }, [modalPagamento, modalBusca, modalCaixa, modalImportador, vendaConcluida, itens, caixaAberto, selectedId, abaAtivaId, abas]);
+      }, [moduloAtivo, modalPagamento, modalBusca, modalCaixa, vendaCupomParaImprimir, itens, caixaAberto, selectedId, abaAtivaId, abas]);
 
       const criarNovaAba = (nome) => {
         const prox = abas.length + 1;
@@ -319,7 +360,7 @@
         }));
       };
 
-      // Leitor com Suporte a Multiplicação e Balança EAN-13 iniciando com '2' (PDVOpen)
+      // Leitor de Código de Barras (com Multiplicação e Balança EAN-13 iniciando em 2)
       const handleBarcodeSubmit = (e) => {
         e.preventDefault();
         const entrada = codigoInput.trim();
@@ -339,13 +380,13 @@
           if (!isNaN(q) && q > 0) { qtd = q; cod = p[1].trim(); }
         }
 
-        // Reconhecimento de Código de Balança Nacional EAN-13 (começa com 2)
+        // Decodificador de Balança EAN-13 (começa com 2)
         if (cod.startsWith('2') && (cod.length === 12 || cod.length === 13)) {
-          const codProd = cod.substring(1, 6).replace(/^0+/, ''); // extrai código do item
+          const codProd = cod.substring(1, 6).replace(/^0+/, '');
           const centavos = parseInt(cod.substring(6, 12), 10);
           const valorReais = centavos / 100.0;
 
-          const prodBalanca = PRODUTOS_DEMO.find(p => p.codigoItemBalanca === codProd || p.id === codProd);
+          const prodBalanca = produtos.find(p => p.codigoItemBalanca === codProd || p.id === codProd);
           if (prodBalanca) {
             const pesoKg = parseFloat((valorReais / prodBalanca.preco).toFixed(3));
             adicionarAoCarrinho(prodBalanca, pesoKg, 'KG');
@@ -354,7 +395,7 @@
           }
         }
 
-        const prod = PRODUTOS_DEMO.find(p => p.codigoBarras === cod);
+        const prod = produtos.find(p => p.codigoBarras === cod);
         if (prod) {
           adicionarAoCarrinho(prod, qtd);
           setCodigoInput('');
@@ -369,242 +410,462 @@
       const totalItens = itens.reduce((acc, i) => acc + (i.unidade === 'KG' ? 1 : i.qtd), 0);
 
       return (
-        <div className="flex flex-col h-screen overflow-hidden">
-          {/* HEADER */}
-          <header className="h-14 bg-slate-900 border-b border-slate-800 px-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="w-3.5 h-3.5 rounded-full bg-emerald-500 shadow-md shadow-emerald-500/50"></span>
-              <span className="font-black text-lg text-white font-mono tracking-wider">PDV ATYLUS</span>
-              <button
-                onClick={() => setModalCaixa(true)}
-                className={`px-3 py-1 rounded-full text-xs font-mono font-bold border transition ${
-                  caixaAberto ? 'bg-emerald-950/60 text-emerald-400 border-emerald-800' : 'bg-red-950/60 text-red-400 border-red-800'
-                }`}
-              >
-                CAIXA {caixaAberto ? 'ABERTO' : 'FECHADO'} (F3)
-              </button>
+        <div className="flex flex-col h-screen overflow-hidden bg-[#070c12]">
+          {/* 1. BARRA DE TÍTULO DESKTOP */}
+          <div className="h-8 bg-[#05080d] border-b border-[#162330] flex items-center justify-between px-3 select-none text-xs font-mono text-slate-400 z-50">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-sky-500 shadow-sm shadow-sky-500/50"></span>
+              <span className="font-extrabold text-slate-200 tracking-wider">HÓRUS ATYLUS PDV</span>
+              <span className="text-[10px] text-slate-500 bg-[#0d151f] px-1.5 py-0.2 rounded border border-slate-800">Desktop</span>
             </div>
 
-            <div className="flex items-center gap-4 text-xs font-mono text-slate-400">
-              <span>Operador: <strong className="text-slate-200">Luiz Portella</strong> (OP01)</span>
-              <button
-                onClick={() => { sound.muted = !sound.muted; setIsMuted(sound.muted); }}
-                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold"
-              >
-                {isMuted ? '🔇 Mudo' : '🔊 Som Ativo'}
-              </button>
+            <div className="flex items-center gap-4 text-[11px]">
+              <span className="text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-900/60">
+                ⚡ 100% Offline-First | SQLite Local
+              </span>
+              <span className="text-slate-400 font-bold">{new Date().toLocaleTimeString('pt-BR')}</span>
             </div>
-          </header>
 
-          {/* BARRA DE MÚLTIPLAS ABAS (PDVOpen Multi-Vendas) */}
-          <div className="bg-slate-900/90 border-b border-slate-800 px-3 py-1.5 flex items-center gap-2 overflow-x-auto select-none font-mono">
-            <span className="text-[11px] font-bold text-slate-500 uppercase mr-1">Atendimento:</span>
-            {abas.map((aba, index) => {
-              const isAtiva = aba.id === abaAtivaId;
-              const totalAba = aba.itens.reduce((acc, i) => acc + i.subtotal, 0);
-
-              return (
-                <div
-                  key={aba.id}
-                  onClick={() => setAbaAtivaId(aba.id)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition border ${
-                    isAtiva
-                      ? 'bg-emerald-600 text-white border-emerald-500 shadow-md'
-                      : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:bg-slate-800 text-slate-300'
-                  }`}
-                >
-                  <span>{index + 1}. {aba.titulo}</span>
-                  {totalAba > 0 && (
-                    <span className={`text-[10px] px-1.5 py-0.2 rounded font-bold ${isAtiva ? 'bg-emerald-700 text-white' : 'bg-slate-700 text-slate-200'}`}>
-                      R$ {totalAba.toFixed(2)}
-                    </span>
-                  )}
-                  {abas.length > 1 && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); fecharAba(aba.id); }}
-                      className="hover:text-red-300 ml-0.5 text-xs font-bold"
-                      title="Fechar aba (Ctrl+W)"
-                    >✕</button>
-                  )}
-                </div>
-              );
-            })}
-
-            <button
-              onClick={() => criarNovaAba()}
-              title="Abrir nova venda em espera (Ctrl+T)"
-              className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-bold flex items-center gap-1 transition"
-            >
-              <span>+ Nova Venda</span>
-              <kbd className="text-[10px] text-slate-500 bg-slate-900 px-1 rounded">Ctrl+T</kbd>
-            </button>
-
-            {abaAtiva.clienteNome && (
-              <div className="ml-auto text-xs text-sky-400 flex items-center gap-1.5 bg-sky-950/60 px-2.5 py-1 rounded-lg border border-sky-800">
-                <span>👤 Cliente: <strong>{abaAtiva.clienteNome}</strong></span>
-              </div>
-            )}
+            <div className="flex items-center gap-1">
+              <button className="w-6 h-5 flex items-center justify-center hover:bg-slate-800 rounded text-slate-400">-</button>
+              <button className="w-6 h-5 flex items-center justify-center hover:bg-slate-800 rounded text-slate-400">▢</button>
+              <button className="w-6 h-5 flex items-center justify-center hover:bg-red-600 rounded text-slate-400 hover:text-white">✕</button>
+            </div>
           </div>
 
-          {/* ÁREA DE VENDA */}
-          <div className="flex-1 flex p-3 gap-3 overflow-hidden">
-            {/* LADO ESQUERDO: Bipador e Carrinho */}
-            <div className="flex-[2] flex flex-col gap-3 min-w-0">
-              {/* INPUT LEITOR */}
-              <form onSubmit={handleBarcodeSubmit} className="relative">
-                <input
-                  ref={barcodeInputRef}
-                  type="text"
-                  placeholder="Bipe código, digite 3*código ou balança 2000100012505..."
-                  value={codigoInput}
-                  onChange={e => setCodigoInput(e.target.value)}
-                  className="w-full pl-4 pr-24 py-3.5 bg-slate-900 border-2 border-slate-700 rounded-2xl text-xl font-mono font-bold text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 shadow-lg tracking-wider"
-                />
-                <button type="submit" className="absolute right-2 top-2 px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-mono font-bold text-sm">
-                  Enter
-                </button>
-                {erroMsg && (
-                  <div className="mt-1 text-red-400 text-xs font-mono bg-red-950/80 p-2 rounded-lg border border-red-800">
-                    ⚠️ {erroMsg}
+          {/* 2. ÁREA PRINCIPAL COM MENU LATERAL (HÓRUS PDV) */}
+          <div className="flex-1 flex overflow-hidden">
+            {/* SIDEBAR COLAPSÁVEL */}
+            <aside className={`bg-[#0b1118] border-r border-[#1a2938] flex flex-col justify-between transition-all duration-200 select-none z-40 ${sidebarColapsada ? 'w-16' : 'w-60'}`}>
+              <div>
+                <div className="p-3 border-b border-[#1a2938] flex items-center justify-between">
+                  {!sidebarColapsada && (
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400 font-bold font-mono text-sm">H</div>
+                      <span className="font-bold text-xs text-white tracking-wide">Menu do PDV</span>
+                    </div>
+                  )}
+                  <button
+                    onClick={() => setSidebarColapsada(!sidebarColapsada)}
+                    className="p-1 rounded bg-[#111c26] hover:bg-[#182635] text-slate-400 hover:text-white mx-auto text-xs font-mono"
+                    title="Recolher/Expandir (Ctrl+B)"
+                  >
+                    {sidebarColapsada ? '▶' : '◀'}
+                  </button>
+                </div>
+
+                <nav className="p-2 space-y-1 text-xs font-medium">
+                  {[
+                    { id: 'pos', label: 'Frente de Caixa', icon: '🛒', atalho: 'F1-F4' },
+                    { id: 'products', label: 'Produtos & Estoque', icon: '📦', atalho: 'Catálogo' },
+                    { id: 'sales', label: 'Histórico de Vendas', icon: '📊', atalho: 'Turno' },
+                    { id: 'cashier', label: 'Controle de Caixa', icon: '🔒', atalho: 'F3' },
+                    { id: 'importer', label: 'Importador IA & XML', icon: '📥', atalho: 'F4' },
+                    { id: 'settings', label: 'Configurações', icon: '⚙️', atalho: 'Ajustes' },
+                  ].map(item => {
+                    const ativo = moduloAtivo === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          if (item.id === 'cashier') setModalCaixa(true);
+                          else setModuloAtivo(item.id);
+                        }}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition ${
+                          ativo
+                            ? 'bg-sky-600 text-white font-bold shadow-md shadow-sky-600/30'
+                            : 'text-slate-400 hover:bg-[#111c26] hover:text-slate-200'
+                        }`}
+                        title={sidebarColapsada ? item.label : undefined}
+                      >
+                        <span className="text-base">{item.icon}</span>
+                        {!sidebarColapsada && (
+                          <div className="flex-1 flex items-center justify-between truncate">
+                            <span className="truncate">{item.label}</span>
+                            <span className={`text-[10px] font-mono px-1 rounded ${ativo ? 'bg-sky-700 text-white' : 'bg-[#111c26] text-slate-500'}`}>{item.atalho}</span>
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </nav>
+              </div>
+
+              {/* Status do Operador */}
+              <div className="p-3 border-t border-[#1a2938] bg-[#080d13] flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-sky-600 flex items-center justify-center text-white font-bold text-xs">LP</div>
+                {!sidebarColapsada && (
+                  <div className="text-[11px] font-mono truncate">
+                    <span className="text-white font-bold block truncate">Luiz Portella</span>
+                    <span className="text-slate-500 text-[10px]">Caixa 01 • Operador</span>
                   </div>
                 )}
-              </form>
+              </div>
+            </aside>
 
-              {/* TABELA DE ITENS */}
-              <div className="flex-1 bg-slate-900/80 rounded-2xl border border-slate-800 flex flex-col overflow-hidden shadow-inner">
-                {itens.length === 0 ? (
-                  <div className="flex-1 flex flex-col items-center justify-center text-slate-500 p-8">
-                    <span className="text-4xl mb-2">🛒</span>
-                    <h3 className="text-xl font-bold text-slate-400">Venda sem Itens ({abaAtiva.titulo})</h3>
-                    <p className="text-sm mt-1">Bipe um item ou aperte <kbd className="px-2 py-0.5 bg-slate-800 text-emerald-400 rounded">F2</kbd> para pesquisar.</p>
+            {/* CONTEÚDO DO MÓDULO ATIVO */}
+            <main className="flex-1 flex flex-col overflow-hidden bg-[#070c12]">
+              {/* MÓDULO 1: FRENTE DE CAIXA (PDV) */}
+              {moduloAtivo === 'pos' && (
+                <div className="flex-1 flex flex-col h-full overflow-hidden">
+                  {/* BARRA DE MÚLTIPLAS ABAS (PDVOpen) */}
+                  <div className="bg-[#0b1118] border-b border-[#1a2938] px-3 py-1.5 flex items-center gap-2 overflow-x-auto select-none font-mono">
+                    <span className="text-[11px] font-bold text-slate-500 uppercase mr-1">Vendas:</span>
+                    {abas.map((aba, index) => {
+                      const isAtiva = aba.id === abaAtivaId;
+                      const totalAba = aba.itens.reduce((acc, i) => acc + i.subtotal, 0);
+
+                      return (
+                        <div
+                          key={aba.id}
+                          onClick={() => setAbaAtivaId(aba.id)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition border ${
+                            isAtiva
+                              ? 'bg-sky-600 text-white border-sky-500 shadow-md'
+                              : 'bg-[#111c26] text-slate-400 border-[#1f3042] hover:bg-[#182635] text-slate-300'
+                          }`}
+                        >
+                          <span>{index + 1}. {aba.titulo}</span>
+                          {totalAba > 0 && (
+                            <span className={`text-[10px] px-1.5 py-0.2 rounded font-bold ${isAtiva ? 'bg-sky-700 text-white' : 'bg-slate-800 text-slate-300'}`}>
+                              R$ {totalAba.toFixed(2)}
+                            </span>
+                          )}
+                          {abas.length > 1 && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); fecharAba(aba.id); }}
+                              className="hover:text-red-300 ml-0.5 text-xs font-bold"
+                              title="Fechar aba (Ctrl+W)"
+                            >✕</button>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    <button
+                      onClick={() => criarNovaAba()}
+                      title="Abrir nova venda em espera (Ctrl+T)"
+                      className="px-2.5 py-1.5 rounded-xl bg-[#111c26] hover:bg-[#182635] border border-[#1f3042] text-slate-300 text-xs font-bold flex items-center gap-1 transition"
+                    >
+                      <span>+ Nova Venda</span>
+                      <kbd className="text-[10px] text-slate-500 bg-[#070c12] px-1 rounded">Ctrl+T</kbd>
+                    </button>
+
+                    <button
+                      onClick={() => setModalCaixa(true)}
+                      className={`ml-auto px-3 py-1 rounded-full text-xs font-mono font-bold border transition ${
+                        caixaAberto ? 'bg-emerald-950/60 text-emerald-400 border-emerald-800' : 'bg-red-950/60 text-red-400 border-red-800'
+                      }`}
+                    >
+                      CAIXA {caixaAberto ? 'ABERTO' : 'FECHADO'} (F3)
+                    </button>
                   </div>
-                ) : (
-                  <div className="overflow-y-auto flex-1">
-                    <table className="w-full text-left text-sm border-collapse font-mono">
-                      <thead className="bg-slate-800 text-slate-400 text-xs uppercase sticky top-0">
+
+                  {/* CORPO DO PDV */}
+                  <div className="flex-1 flex p-3 gap-3 overflow-hidden">
+                    {/* ESQUERDA: Leitor e Tabela */}
+                    <div className="flex-[2] flex flex-col gap-3 min-w-0">
+                      <form onSubmit={handleBarcodeSubmit} className="relative">
+                        <input
+                          ref={barcodeInputRef}
+                          type="text"
+                          placeholder="Passe o leitor, digite 3*código ou balança 2000100012505..."
+                          value={codigoInput}
+                          onChange={e => setCodigoInput(e.target.value)}
+                          className="w-full pl-4 pr-24 py-3 bg-[#0d1620] border-2 border-[#1f3042] rounded-2xl text-xl font-mono font-bold text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 shadow-xl tracking-wider"
+                        />
+                        <button type="submit" className="absolute right-2 top-2 px-5 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl font-mono font-bold text-sm">
+                          Enter
+                        </button>
+                        {erroMsg && (
+                          <div className="mt-1 text-red-400 text-xs font-mono bg-red-950/80 p-2 rounded-lg border border-red-800">
+                            ⚠️ {erroMsg}
+                          </div>
+                        )}
+                      </form>
+
+                      {/* Tabela do Carrinho */}
+                      <div className="flex-1 bg-[#0d1620] rounded-2xl border border-[#1f3042] flex flex-col overflow-hidden shadow-inner">
+                        {itens.length === 0 ? (
+                          <div className="flex-1 flex flex-col items-center justify-center text-slate-500 p-8">
+                            <span className="text-4xl mb-2">🛒</span>
+                            <h3 className="text-lg font-bold text-slate-400">Venda sem Itens ({abaAtiva.titulo})</h3>
+                            <p className="text-xs mt-1">Bipe um item ou aperte <kbd className="px-1.5 py-0.5 bg-slate-800 text-sky-400 rounded">F2</kbd> para pesquisar.</p>
+                          </div>
+                        ) : (
+                          <div className="overflow-y-auto flex-1">
+                            <table className="w-full text-left text-xs border-collapse font-mono">
+                              <thead className="bg-[#14212e] text-slate-400 uppercase sticky top-0 border-b border-[#1f3042]">
+                                <tr>
+                                  <th className="p-3 text-center w-12">#</th>
+                                  <th className="p-3 w-36">Código</th>
+                                  <th className="p-3 font-sans">Descrição</th>
+                                  <th className="p-3 text-right w-24">Unitário</th>
+                                  <th className="p-3 text-center w-36">Qtd / Peso</th>
+                                  <th className="p-3 text-right w-28">Subtotal</th>
+                                  <th className="p-3 text-center w-12">X</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-[#1a2938]">
+                                {itens.map((i, idx) => (
+                                  <tr
+                                    key={i.id}
+                                    onClick={() => atualizarAbaAtual({ selectedId: i.id })}
+                                    className={`cursor-pointer transition ${i.id === selectedId ? 'bg-sky-950/40 text-white border-l-4 border-sky-500' : 'hover:bg-[#111c26] text-slate-300'}`}
+                                  >
+                                    <td className="p-3 text-center text-slate-500">{String(idx + 1).padStart(2, '0')}</td>
+                                    <td className="p-3 text-slate-400">{i.codigoBarras}</td>
+                                    <td className="p-3 font-sans font-medium text-slate-100">
+                                      {i.nome}
+                                      {i.unidade === 'KG' && <span className="ml-2 px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 text-[10px] border border-amber-800 font-mono font-bold">KG</span>}
+                                    </td>
+                                    <td className="p-3 text-right">R$ {i.preco.toFixed(2)}</td>
+                                    <td className="p-3 text-center">
+                                      <div className="flex items-center justify-center gap-1.5" onClick={e => e.stopPropagation()}>
+                                        <button onClick={() => alterarQtd(i.id, -1)} className="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 font-bold">-</button>
+                                        <span className="w-12 text-center font-bold text-white text-xs">{i.unidade === 'KG' ? `${i.qtd.toFixed(3)}kg` : i.qtd}</span>
+                                        <button onClick={() => alterarQtd(i.id, 1)} className="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 font-bold">+</button>
+                                      </div>
+                                    </td>
+                                    <td className="p-3 text-right font-bold text-emerald-400 text-sm">R$ {i.subtotal.toFixed(2)}</td>
+                                    <td className="p-3 text-center" onClick={e => e.stopPropagation()}>
+                                      <button onClick={() => removerItem(i.id)} className="text-slate-500 hover:text-red-400">🗑️</button>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* DIREITA: Display Digital e Atalhos (Estilo Hórus PDV) */}
+                    <div className="flex-1 flex flex-col gap-3 min-w-[300px] max-w-[380px]">
+                      {/* DISPLAY DIGITAL */}
+                      <div className="bg-[#0d1620] border border-[#1f3042] rounded-2xl p-5 shadow-2xl font-mono">
+                        <div className="space-y-2 text-xs text-slate-400">
+                          <div className="flex justify-between">
+                            <span>SUBTOTAL:</span>
+                            <span className="font-bold text-slate-200">R$ {totalBruto.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>DESCONTO:</span>
+                            <span className="font-bold text-red-400">- R$ {desconto.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between text-slate-500 pt-1 border-t border-[#1f3042]">
+                            <span>TOTAL DE ITENS:</span>
+                            <span>{totalItens}</span>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 pt-3 border-t-2 border-dashed border-[#1f3042] text-right">
+                          <span className="text-xs text-emerald-400 font-bold uppercase tracking-wider block">VALOR LÍQUIDO</span>
+                          <div className="text-4xl lg:text-5xl font-black text-emerald-400 tracking-tight mt-1 drop-shadow-[0_2px_8px_rgba(16,185,129,0.3)]">
+                            R$ {totalLiquido.toFixed(2)}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* PAINEL DE ATALHOS */}
+                      <div className="flex-1 bg-[#0d1620]/70 border border-[#1f3042] rounded-2xl p-4 flex flex-col justify-between gap-2 font-mono">
+                        <div className="space-y-2">
+                          <button
+                            onClick={() => {
+                              if (itens.length > 0 && caixaAberto) setModalPagamento(true);
+                              else { sound.playError(); setErroMsg('Caixa fechado ou carrinho vazio.'); }
+                            }}
+                            disabled={itens.length === 0}
+                            className="w-full py-3.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-slate-950 font-black text-base flex justify-between items-center shadow-lg shadow-emerald-500/20 transition active:scale-95"
+                          >
+                            <span>✅ FINALIZAR VENDA</span>
+                            <kbd className="px-2 py-0.5 rounded bg-emerald-600/70 text-slate-950 text-xs">F1</kbd>
+                          </button>
+
+                          <button
+                            onClick={() => setModalBusca(true)}
+                            className="w-full py-2.5 px-4 rounded-xl bg-sky-950/60 hover:bg-sky-900/70 border border-sky-800/60 text-sky-200 font-bold text-xs flex justify-between items-center"
+                          >
+                            <span>🔍 BUSCAR PRODUTO</span>
+                            <kbd className="px-2 py-0.5 rounded bg-sky-900 text-sky-300 text-xs">F2</kbd>
+                          </button>
+
+                          <button
+                            onClick={() => setModalCaixa(true)}
+                            className="w-full py-2.5 px-4 rounded-xl bg-amber-950/60 hover:bg-amber-900/70 border border-amber-800/60 text-amber-200 font-bold text-xs flex justify-between items-center"
+                          >
+                            <span>🔒 GESTÃO DE CAIXA</span>
+                            <kbd className="px-2 py-0.5 rounded bg-amber-900 text-amber-300 text-xs">F3</kbd>
+                          </button>
+
+                          <button
+                            onClick={() => setModuloAtivo('importer')}
+                            className="w-full py-2.5 px-4 rounded-xl bg-indigo-950/60 hover:bg-indigo-900/70 border border-indigo-800/60 text-indigo-200 font-bold text-xs flex justify-between items-center"
+                          >
+                            <span>📥 IMPORTAÇÃO IA/XML</span>
+                            <kbd className="px-2 py-0.5 rounded bg-indigo-900 text-indigo-300 text-xs">F4</kbd>
+                          </button>
+                        </div>
+
+                        <button
+                          onClick={() => { if (itens.length > 0 && confirm('Limpar itens da venda atual?')) atualizarAbaAtual({ itens: [], selectedId: null, desconto: 0 }); }}
+                          className="w-full py-2 px-3 rounded-xl bg-slate-800/60 hover:bg-red-950/50 hover:text-red-400 border border-slate-700/60 text-slate-400 text-xs font-bold flex justify-between items-center"
+                        >
+                          <span>🔄 LIMPAR VENDA</span>
+                          <kbd className="px-1.5 py-0.5 rounded bg-slate-700 text-slate-300 text-[10px]">Esc</kbd>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* MÓDULO 2: PRODUTOS & ESTOQUE */}
+              {moduloAtivo === 'products' && (
+                <div className="flex-1 p-6 overflow-y-auto space-y-4 font-mono">
+                  <div className="flex justify-between items-center border-b border-[#1f3042] pb-3">
+                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                      <span>📦</span> Catálogo de Produtos & Estoque
+                    </h2>
+                    <span className="text-xs text-slate-400">{produtos.length} produtos cadastrados</span>
+                  </div>
+
+                  <div className="bg-[#0d1620] border border-[#1f3042] rounded-2xl overflow-hidden shadow-xl">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead className="bg-[#14212e] text-slate-400 uppercase">
                         <tr>
-                          <th className="p-3 text-center w-12">#</th>
-                          <th className="p-3 w-36">Código</th>
+                          <th className="p-3">Cód. Barras</th>
                           <th className="p-3 font-sans">Descrição</th>
-                          <th className="p-3 text-right w-24">Unitário</th>
-                          <th className="p-3 text-center w-36">Qtd / Peso</th>
-                          <th className="p-3 text-right w-28">Subtotal</th>
-                          <th className="p-3 text-center w-12">X</th>
+                          <th className="p-3 text-center">Un.</th>
+                          <th className="p-3 text-right">Preço Venda</th>
+                          <th className="p-3 text-center">Estoque</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-800">
-                        {itens.map((i, idx) => (
-                          <tr
-                            key={i.id}
-                            onClick={() => atualizarAbaAtual({ selectedId: i.id })}
-                            className={`cursor-pointer transition ${i.id === selectedId ? 'bg-emerald-950/40 text-white border-l-4 border-emerald-500' : 'hover:bg-slate-800/40 text-slate-300'}`}
-                          >
-                            <td className="p-3 text-center text-xs text-slate-500">{String(idx + 1).padStart(2, '0')}</td>
-                            <td className="p-3 text-xs text-slate-400">{i.codigoBarras}</td>
-                            <td className="p-3 font-sans font-medium text-slate-200">
-                              {i.nome}
-                              {i.unidade === 'KG' && <span className="ml-2 px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 text-[10px] border border-amber-800 font-mono font-bold">KG</span>}
-                            </td>
-                            <td className="p-3 text-right">R$ {i.preco.toFixed(2)}</td>
+                      <tbody className="divide-y divide-[#1a2938] text-slate-300">
+                        {produtos.map(p => (
+                          <tr key={p.id} className="hover:bg-[#111c26]">
+                            <td className="p-3 text-slate-400">{p.codigoBarras}</td>
+                            <td className="p-3 font-sans font-medium text-white">{p.nome}</td>
+                            <td className="p-3 text-center">{p.unidade}</td>
+                            <td className="p-3 text-right font-bold text-emerald-400">R$ {p.preco.toFixed(2)}</td>
+                            <td className="p-3 text-center font-bold">{p.estoque} {p.unidade}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* MÓDULO 3: HISTÓRICO DE VENDAS */}
+              {moduloAtivo === 'sales' && (
+                <div className="flex-1 p-6 overflow-y-auto space-y-4 font-mono">
+                  <div className="flex justify-between items-center border-b border-[#1f3042] pb-3">
+                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                      <span>📊</span> Histórico de Vendas Realizadas
+                    </h2>
+                    <span className="text-xs text-slate-400">{historicoVendas.length} vendas gravadas</span>
+                  </div>
+
+                  <div className="bg-[#0d1620] border border-[#1f3042] rounded-2xl overflow-hidden shadow-xl">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead className="bg-[#14212e] text-slate-400 uppercase">
+                        <tr>
+                          <th className="p-3">Venda ID</th>
+                          <th className="p-3">Data/Hora</th>
+                          <th className="p-3 font-sans">Cliente</th>
+                          <th className="p-3 text-right">Total</th>
+                          <th className="p-3 text-center">Status</th>
+                          <th className="p-3 text-center">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#1a2938] text-slate-300">
+                        {historicoVendas.map(v => (
+                          <tr key={v.id} className="hover:bg-[#111c26]">
+                            <td className="p-3 font-bold text-sky-400">{v.id}</td>
+                            <td className="p-3 text-slate-400">{new Date(v.dataVenda).toLocaleTimeString('pt-BR')}</td>
+                            <td className="p-3 font-sans text-white">{v.clienteNome || 'Consumidor'}</td>
+                            <td className="p-3 text-right font-bold text-emerald-400">R$ {v.total.toFixed(2)}</td>
                             <td className="p-3 text-center">
-                              <div className="flex items-center justify-center gap-1.5" onClick={e => e.stopPropagation()}>
-                                <button onClick={() => alterarQtd(i.id, -1)} className="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 font-bold">-</button>
-                                <span className="w-12 text-center font-bold text-white text-xs">{i.unidade === 'KG' ? `${i.qtd.toFixed(3)} kg` : i.qtd}</span>
-                                <button onClick={() => alterarQtd(i.id, 1)} className="w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 font-bold">+</button>
-                              </div>
+                              <span className="px-2 py-0.5 rounded text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-900">{v.status}</span>
                             </td>
-                            <td className="p-3 text-right font-bold text-emerald-400 text-base">R$ {i.subtotal.toFixed(2)}</td>
-                            <td className="p-3 text-center" onClick={e => e.stopPropagation()}>
-                              <button onClick={() => removerItem(i.id)} className="text-slate-500 hover:text-red-400">🗑️</button>
+                            <td className="p-3 text-center">
+                              <button onClick={() => setVendaCupomParaImprimir(v)} className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-xs font-bold">
+                                🖨️ Reimprimir
+                              </button>
                             </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
-                )}
-              </div>
-            </div>
+                </div>
+              )}
 
-            {/* LADO DIREITO: Painel Digital e Botões */}
-            <div className="flex-1 flex flex-col gap-3 min-w-[320px] max-w-[420px]">
-              {/* DISPLAY FINANCEIRO */}
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-2xl font-mono">
-                <div className="space-y-2 text-sm text-slate-400">
-                  <div className="flex justify-between">
-                    <span>SUBTOTAL:</span>
-                    <span className="font-bold text-slate-200">R$ {totalBruto.toFixed(2)}</span>
+              {/* MÓDULO 4: IMPORTADOR IA & XML NF-E */}
+              {moduloAtivo === 'importer' && (
+                <div className="flex-1 p-6 overflow-y-auto space-y-4 font-mono">
+                  <div className="flex justify-between items-center border-b border-[#1f3042] pb-3">
+                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                      <span>📥</span> Importador Inteligente (XML de NF-e & IA)
+                    </h2>
+                    <button onClick={() => setModuloAtivo('pos')} className="px-3 py-1 bg-slate-800 text-slate-300 rounded text-xs">Voltar ao PDV</button>
                   </div>
-                  <div className="flex justify-between">
-                    <span>DESCONTO:</span>
-                    <span className="font-bold text-red-400">- R$ {desconto.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs text-slate-500 pt-1 border-t border-slate-800">
-                    <span>TOTAL DE ITENS:</span>
-                    <span>{totalItens}</span>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-5 bg-[#0d1620] border border-[#1f3042] rounded-2xl space-y-3">
+                      <h3 className="font-bold text-white text-sm">📄 Importação de NF-e (XML da SEFAZ - PDVOpen)</h3>
+                      <p className="text-xs text-slate-400">Importa produtos e quantidades de notas fiscais de compra em segundos.</p>
+                      <button
+                        onClick={() => {
+                          setProdutos(prev => [
+                            ...prev,
+                            { id: '15', codigoBarras: '7891000100103', nome: 'Leite Condensado Moça 395g', preco: 7.80, custo: 5.20, estoque: 50, unidade: 'UN' }
+                          ]);
+                          alert('Produto da NF-e importado para o catálogo!');
+                        }}
+                        className="w-full py-2.5 bg-sky-600 hover:bg-sky-500 font-bold text-white rounded-xl text-xs"
+                      >
+                        Carregar Exemplo de NF-e XML
+                      </button>
+                    </div>
+
+                    <div className="p-5 bg-[#0d1620] border border-[#1f3042] rounded-2xl space-y-3">
+                      <h3 className="font-bold text-white text-sm">✨ Mapeamento por IA (Gemini / OpenAI)</h3>
+                      <p className="text-xs text-slate-400">Reconhece colunas desconhecidas de planilhas CSV e Excel automaticamente.</p>
+                      <button
+                        onClick={() => alert('Planilha analisada com 98% de precisão!')}
+                        className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 font-bold text-white rounded-xl text-xs"
+                      >
+                        Mapear Planilha com IA
+                      </button>
+                    </div>
                   </div>
                 </div>
+              )}
 
-                <div className="mt-4 pt-3 border-t-2 border-dashed border-slate-800 text-right">
-                  <span className="text-xs text-emerald-400 font-bold uppercase tracking-wider block">VALOR LÍQUIDO ({abaAtiva.titulo})</span>
-                  <div className="text-5xl font-black text-emerald-400 tracking-tight mt-1">
-                    R$ {totalLiquido.toFixed(2)}
+              {/* MÓDULO 5: CONFIGURAÇÕES */}
+              {moduloAtivo === 'settings' && (
+                <div className="flex-1 p-6 overflow-y-auto space-y-4 font-mono text-xs">
+                  <div className="flex justify-between items-center border-b border-[#1f3042] pb-3">
+                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                      <span>⚙️</span> Configurações do Programa Desktop
+                    </h2>
+                  </div>
+
+                  <div className="p-5 bg-[#0d1620] border border-[#1f3042] rounded-2xl space-y-2">
+                    <h3 className="font-bold text-white text-sm">☁️ Backup Google Drive</h3>
+                    <p className="text-slate-400">Banco SQLite local salvo automaticamente em .zip na pasta /backups e sincronizado com o Drive.</p>
+                    <button onClick={() => alert('Backup SQLite compactado com sucesso!')} className="px-4 py-2 bg-sky-600 text-white font-bold rounded-lg mt-2">
+                      Executar Backup Agora
+                    </button>
                   </div>
                 </div>
-              </div>
-
-              {/* BOTÕES DE ATALHO */}
-              <div className="flex-1 bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between gap-2 font-mono">
-                <div className="space-y-2">
-                  <button
-                    onClick={() => {
-                      if (itens.length > 0 && caixaAberto) setModalPagamento(true);
-                      else { sound.playError(); setErroMsg('Caixa fechado ou carrinho vazio.'); }
-                    }}
-                    disabled={itens.length === 0}
-                    className="w-full py-4 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-slate-950 font-black text-base flex justify-between items-center shadow-lg shadow-emerald-500/20 transition active:scale-95"
-                  >
-                    <span>✅ FINALIZAR VENDA</span>
-                    <kbd className="px-2 py-0.5 rounded bg-emerald-600/70 text-slate-950 text-xs">F1</kbd>
-                  </button>
-
-                  <button
-                    onClick={() => setModalBusca(true)}
-                    className="w-full py-3 px-4 rounded-xl bg-sky-950/60 hover:bg-sky-900/70 border border-sky-800/60 text-sky-200 font-bold text-sm flex justify-between items-center"
-                  >
-                    <span>🔍 BUSCAR PRODUTO</span>
-                    <kbd className="px-2 py-0.5 rounded bg-sky-900 text-sky-300 text-xs">F2</kbd>
-                  </button>
-
-                  <button
-                    onClick={() => setModalCaixa(true)}
-                    className="w-full py-3 px-4 rounded-xl bg-amber-950/60 hover:bg-amber-900/70 border border-amber-800/60 text-amber-200 font-bold text-sm flex justify-between items-center"
-                  >
-                    <span>🔒 CONTROLE DE CAIXA</span>
-                    <kbd className="px-2 py-0.5 rounded bg-amber-900 text-amber-300 text-xs">F3</kbd>
-                  </button>
-
-                  <button
-                    onClick={() => setModalImportador(true)}
-                    className="w-full py-3 px-4 rounded-xl bg-indigo-950/60 hover:bg-indigo-900/70 border border-indigo-800/60 text-indigo-200 font-bold text-sm flex justify-between items-center"
-                  >
-                    <span>📊 IMPORTAR IA & NF-e XML</span>
-                    <kbd className="px-2 py-0.5 rounded bg-indigo-900 text-indigo-300 text-xs">F4</kbd>
-                  </button>
-                </div>
-
-                <button
-                  onClick={() => { if (itens.length > 0 && confirm('Limpar itens da venda atual?')) atualizarAbaAtual({ itens: [], selectedId: null, desconto: 0 }); }}
-                  className="w-full py-2.5 px-3 rounded-xl bg-slate-800/60 hover:bg-red-950/50 hover:text-red-400 border border-slate-700/60 text-slate-400 text-xs font-bold flex justify-between items-center"
-                >
-                  <span>🔄 LIMPAR CARRINHO</span>
-                  <kbd className="px-1.5 py-0.5 rounded bg-slate-700 text-slate-300 text-[10px]">Esc</kbd>
-                </button>
-              </div>
-            </div>
+              )}
+            </main>
           </div>
 
-          {/* MODAL PAGAMENTO MULTIFORMAS (F1 - Padrão PDVOpen) */}
+          {/* MODAL PAGAMENTO MULTIFORMAS (PDVOpen) */}
           {modalPagamento && (
             <ModalPagamentoMultiformasComponent
               total={totalLiquido}
@@ -613,7 +874,7 @@
               onClose={() => setModalPagamento(false)}
               onSucesso={(pagamentos, clienteInfo) => {
                 sound.playChime();
-                const venda = {
+                const novaVenda = {
                   id: 'VND-' + Date.now().toString().slice(-6),
                   dataVenda: new Date().toISOString(),
                   operador: 'Luiz Portella',
@@ -623,11 +884,13 @@
                   subtotal: totalBruto,
                   desconto,
                   total: totalLiquido,
+                  status: 'Concluida',
                   pagamentos: pagamentos
                 };
+                setHistoricoVendas(prev => [novaVenda, ...prev]);
                 fecharAba(abaAtivaId);
                 setModalPagamento(false);
-                setVendaConcluida(venda);
+                setVendaCupomParaImprimir(novaVenda);
               }}
             />
           )}
@@ -635,7 +898,7 @@
           {/* MODAL BUSCA (F2) */}
           {modalBusca && (
             <ModalBuscaComponent
-              produtos={PRODUTOS_DEMO}
+              produtos={produtos}
               onClose={() => setModalBusca(false)}
               onSelecionar={p => {
                 adicionarAoCarrinho(p, p.unidade === 'KG' ? 0.5 : 1);
@@ -668,30 +931,18 @@
             />
           )}
 
-          {/* MODAL IMPORTADOR IA & NF-e XML (F4) */}
-          {modalImportador && (
-            <ModalImportadorAvancadoComponent
-              onClose={() => setModalImportador(false)}
-              onImportarNovosProdutos={novos => {
-                novos.forEach(p => PRODUTOS_DEMO.push(p));
-                setModalImportador(false);
-                alert(`${novos.length} novos produtos adicionados ao catálogo!`);
-              }}
-            />
-          )}
-
           {/* MODAL CUPOM TÉRMICO */}
-          {vendaConcluida && (
+          {vendaCupomParaImprimir && (
             <ModalCupomAvancadoComponent
-              venda={vendaConcluida}
-              onClose={() => setVendaConcluida(null)}
+              venda={vendaCupomParaImprimir}
+              onClose={() => setVendaCupomParaImprimir(null)}
             />
           )}
         </div>
       );
     }
 
-    // --- MODAL PAGAMENTO MULTIFORMAS (PDVOpen) ---
+    // --- SUB-COMPONENTES MODAIS ---
     function ModalPagamentoMultiformasComponent({ total, clienteNomeInicial, clienteDocInicial, onClose, onSucesso }) {
       const [forma, setForma] = useState('Dinheiro');
       const [pagamentosLancados, setPagamentosLancados] = useState([]);
@@ -725,17 +976,16 @@
 
       return (
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="w-full max-w-3xl bg-slate-900 border border-slate-700 rounded-3xl overflow-hidden shadow-2xl flex flex-col font-sans max-h-[95vh]">
-            <div className="p-4 bg-slate-800 border-b border-slate-700 flex justify-between items-center">
+          <div className="w-full max-w-3xl bg-[#0d1620] border border-[#1f3042] rounded-3xl overflow-hidden shadow-2xl flex flex-col font-sans max-h-[95vh]">
+            <div className="p-4 bg-[#14212e] border-b border-[#1f3042] flex justify-between items-center">
               <div>
-                <h3 className="font-bold text-white text-lg">💰 Pagamento Multiformas (Padrão PDVOpen)</h3>
-                <p className="text-xs text-slate-400">Total a Pagar: R$ {total.toFixed(2)}</p>
+                <h3 className="font-bold text-white text-base">💰 Pagamento Multiformas (Padrão PDVOpen)</h3>
+                <p className="text-xs text-slate-400 font-mono">Total a Pagar: R$ {total.toFixed(2)}</p>
               </div>
               <button onClick={onClose} className="text-slate-400 hover:text-white font-mono text-xl">✕</button>
             </div>
 
-            {/* Placar de Quitação */}
-            <div className="grid grid-cols-3 p-4 bg-slate-950/70 border-b border-slate-800 text-center font-mono">
+            <div className="grid grid-cols-3 p-4 bg-[#080d13] border-b border-[#1f3042] text-center font-mono">
               <div>
                 <span className="text-[10px] text-slate-400 uppercase">Total da Venda</span>
                 <div className="text-xl font-bold text-white">R$ {total.toFixed(2)}</div>
@@ -752,68 +1002,66 @@
               </div>
             </div>
 
-            <div className="p-6 flex-1 overflow-y-auto space-y-4">
-              {/* Identificação de Cliente */}
-              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex gap-3 text-xs font-mono">
+            <div className="p-6 flex-1 overflow-y-auto space-y-4 font-mono text-xs">
+              <div className="p-3 bg-[#080d13] rounded-xl border border-[#1f3042] flex gap-3">
                 <input
                   type="text"
                   placeholder="Nome do Cliente (opcional no cupom)"
                   value={clienteNome}
                   onChange={e => setClienteNome(e.target.value)}
-                  className="flex-1 p-2 bg-slate-900 border border-slate-700 rounded-lg text-white"
+                  className="flex-1 p-2 bg-[#111c26] border border-[#1f3042] rounded-lg text-white"
                 />
                 <input
                   type="text"
                   placeholder="CPF / CNPJ"
                   value={clienteDoc}
                   onChange={e => setClienteDoc(e.target.value)}
-                  className="w-48 p-2 bg-slate-900 border border-slate-700 rounded-lg text-white"
+                  className="w-48 p-2 bg-[#111c26] border border-[#1f3042] rounded-lg text-white"
                 />
               </div>
 
-              {/* Botões de Formas */}
               {!isQuitado && (
                 <div className="space-y-3">
-                  <div className="grid grid-cols-4 gap-2 font-mono text-xs">
+                  <div className="grid grid-cols-4 gap-2">
                     {['Dinheiro', 'Pix', 'CartaoCredito', 'CartaoDebito'].map(f => (
                       <button
                         key={f}
                         onClick={() => setForma(f)}
-                        className={`p-2.5 rounded-xl font-bold border transition ${forma === f ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-slate-800 text-slate-400 border-slate-700'}`}
+                        className={`p-2.5 rounded-xl font-bold border transition ${forma === f ? 'bg-sky-600 text-white border-sky-500' : 'bg-[#111c26] text-slate-400 border-[#1f3042]'}`}
                       >
                         {f === 'CartaoCredito' ? '💳 Crédito' : f === 'CartaoDebito' ? '💳 Débito' : f === 'Pix' ? '⚡ Pix' : '💵 Dinheiro'}
                       </button>
                     ))}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 font-mono">
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-xs text-slate-400">Valor Desta Parcela (R$):</label>
+                      <label className="text-slate-400">Valor Desta Parcela (R$):</label>
                       <input
                         type="number"
                         step="0.01"
                         max={restante}
                         value={valorParcela}
                         onChange={e => setValorParcela(Math.min(restante, parseFloat(e.target.value) || 0))}
-                        className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-xl text-lg font-bold text-white mt-1"
+                        className="w-full p-2.5 bg-[#080d13] border border-[#1f3042] rounded-xl text-lg font-bold text-white mt-1"
                       />
                     </div>
                     {forma === 'Dinheiro' && (
                       <div>
-                        <label className="text-xs text-slate-400">Dinheiro Entregue (Troco):</label>
+                        <label className="text-slate-400">Dinheiro Entregue (Troco):</label>
                         <input
                           type="number"
                           step="0.01"
                           value={dinheiroEntregue}
                           onChange={e => setDinheiroEntregue(parseFloat(e.target.value) || 0)}
-                          className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-xl text-lg font-bold text-white mt-1"
+                          className="w-full p-2.5 bg-[#080d13] border border-[#1f3042] rounded-xl text-lg font-bold text-white mt-1"
                         />
                       </div>
                     )}
                   </div>
 
                   {forma === 'Dinheiro' && trocoCalculado > 0 && (
-                    <div className="p-2.5 bg-amber-950/60 border border-amber-800 rounded-xl text-amber-300 font-mono text-xs flex justify-between font-bold">
+                    <div className="p-2.5 bg-amber-950/60 border border-amber-800 rounded-xl text-amber-300 flex justify-between font-bold">
                       <span>TROCO NESTA PARCELA:</span>
                       <span className="text-base">R$ {trocoCalculado.toFixed(2)}</span>
                     </div>
@@ -821,22 +1069,21 @@
 
                   <button
                     onClick={lancar}
-                    className="w-full py-2.5 bg-sky-600 hover:bg-sky-500 font-mono font-bold text-white rounded-xl text-xs"
+                    className="w-full py-2.5 bg-sky-600 hover:bg-sky-500 font-bold text-white rounded-xl"
                   >
                     + Adicionar Parcela de R$ {valorParcela.toFixed(2)} no {forma}
                   </button>
                 </div>
               )}
 
-              {/* Lista de Parcelas */}
               <div>
-                <h4 className="text-xs font-mono font-bold text-slate-400 uppercase mb-2">Parcelas Confirmadas:</h4>
+                <h4 className="text-slate-400 font-bold uppercase mb-2">Parcelas Lançadas:</h4>
                 {pagamentosLancados.length === 0 ? (
-                  <p className="text-xs text-slate-600 font-mono">Nenhum pagamento lançado ainda.</p>
+                  <p className="text-slate-600">Nenhum pagamento lançado ainda.</p>
                 ) : (
-                  <div className="space-y-1.5 font-mono text-xs">
+                  <div className="space-y-1.5">
                     {pagamentosLancados.map((p, idx) => (
-                      <div key={idx} className="p-2.5 bg-slate-950 rounded-xl border border-slate-800 flex justify-between items-center">
+                      <div key={idx} className="p-2.5 bg-[#080d13] rounded-xl border border-[#1f3042] flex justify-between items-center">
                         <span>• {p.forma} {p.troco > 0 ? `(Troco R$ ${p.troco.toFixed(2)})` : ''}</span>
                         <div className="flex items-center gap-2">
                           <span className="text-emerald-400 font-bold">R$ {p.valor.toFixed(2)}</span>
@@ -849,86 +1096,16 @@
               </div>
             </div>
 
-            <div className="p-4 bg-slate-950 border-t border-slate-800 flex justify-between font-mono">
-              <button onClick={onClose} className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-xs">[Esc] Cancelar</button>
+            <div className="p-4 bg-[#080d13] border-t border-[#1f3042] flex justify-between font-mono text-xs">
+              <button onClick={onClose} className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl">[Esc] Cancelar</button>
               <button
                 disabled={!isQuitado}
                 onClick={() => onSucesso(pagamentosLancados, { nome: clienteNome, doc: clienteDoc })}
-                className={`px-6 py-2.5 rounded-xl font-bold text-xs ${isQuitado ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950' : 'bg-slate-800 text-slate-600 cursor-not-allowed'}`}
+                className={`px-6 py-2.5 rounded-xl font-bold ${isQuitado ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950' : 'bg-slate-800 text-slate-600 cursor-not-allowed'}`}
               >
                 {isQuitado ? 'Confirmar e Fechar Venda (Enter)' : `Falta lançar R$ ${restante.toFixed(2)}`}
               </button>
             </div>
-          </div>
-        </div>
-      );
-    }
-
-    // --- MODAL IMPORTADOR AVANÇADO (IA + XML NF-e - PDVOpen) ---
-    function ModalImportadorAvancadoComponent({ onClose, onImportarNovosProdutos }) {
-      const [modo, setModo] = useState('xml');
-
-      return (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl p-6 font-sans space-y-4">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-              <h3 className="font-bold text-white text-base">Central de Importação: NF-e XML & IA</h3>
-              <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
-            </div>
-
-            <div className="flex gap-2 font-mono text-xs">
-              <button onClick={() => setModo('xml')} className={`flex-1 py-2 rounded-lg font-bold ${modo === 'xml' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'}`}>
-                📄 Nota Fiscal XML (NF-e Fornecedor - PDVOpen)
-              </button>
-              <button onClick={() => setModo('ia')} className={`flex-1 py-2 rounded-lg font-bold ${modo === 'ia' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'}`}>
-                ✨ Planilha Inteligente com IA
-              </button>
-            </div>
-
-            {modo === 'xml' ? (
-              <div className="space-y-3 font-mono text-xs">
-                <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl space-y-1">
-                  <div className="font-bold text-sky-400">Entrada Rápida de Estoque por XML de NF-e:</div>
-                  <p className="text-slate-400">Lê automaticamente código GTIN/EAN, nome do produto, NCM, quantidade de entrada e preço de custo, calculando o preço de venda sugerido com base no markup.</p>
-                </div>
-
-                <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl">
-                  <span className="text-slate-400 font-bold block mb-1">Itens Identificados no XML da NF-e #00012485:</span>
-                  <div className="space-y-1 text-slate-300">
-                    <div className="flex justify-between">• Leite Condensado Moça 395g (+50 un) ➔ Custo: R$ 5.20 | Venda: R$ 7.80</div>
-                    <div className="flex justify-between">• Arroz Tio João 5kg (+30 un) ➔ Custo: R$ 21.80 | Venda: R$ 29.90</div>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => {
-                    onImportarNovosProdutos([
-                      { id: '15', codigoBarras: '7891000100103', nome: 'Leite Condensado Moça 395g', preco: 7.80, estoque: 50, unidade: 'UN' },
-                      { id: '16', codigoBarras: '7898000000000', nome: 'Arroz Tio João 5kg', preco: 29.90, estoque: 30, unidade: 'UN' }
-                    ]);
-                  }}
-                  className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 font-bold text-slate-950 rounded-xl text-sm"
-                >
-                  Dar Entrada em Estoque da NF-e no Banco Local
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-3 font-mono text-xs">
-                <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl text-slate-400">
-                  A IA analisa cabeçalhos desconhecidos e correlaciona as colunas automaticamente com suporte a arquivos CSV e Excel.
-                </div>
-                <button
-                  onClick={() => {
-                    onImportarNovosProdutos([
-                      { id: '17', codigoBarras: '7891000200000', nome: 'Achocolatado Nescau 400g', preco: 8.90, estoque: 45, unidade: 'UN' }
-                    ]);
-                  }}
-                  className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 font-bold text-white rounded-xl text-sm"
-                >
-                  Confirmar Importação de Planilha via IA
-                </button>
-              </div>
-            )}
           </div>
         </div>
       );
@@ -940,35 +1117,33 @@
 
       return (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-xl bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl flex flex-col font-sans max-h-[80vh]">
-            <div className="p-4 bg-slate-800 border-b border-slate-700 flex justify-between items-center">
+          <div className="w-full max-w-xl bg-[#0d1620] border border-[#1f3042] rounded-2xl overflow-hidden shadow-2xl flex flex-col font-sans max-h-[80vh]">
+            <div className="p-4 bg-[#14212e] border-b border-[#1f3042] flex justify-between items-center">
               <h3 className="font-bold text-white">🔍 Buscar Produtos (F2)</h3>
               <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
             </div>
-            <div className="p-4 border-b border-slate-800">
+            <div className="p-4 border-b border-[#1f3042]">
               <input
                 autoFocus
                 type="text"
                 placeholder="Digite o nome ou código..."
                 value={termo}
                 onChange={e => setTermo(e.target.value)}
-                className="w-full p-3 bg-slate-950 border border-slate-700 rounded-xl text-white font-mono"
+                className="w-full p-2.5 bg-[#080d13] border border-[#1f3042] rounded-xl text-white font-mono text-xs"
               />
             </div>
-            <div className="flex-1 overflow-y-auto divide-y divide-slate-800 p-2">
+            <div className="flex-1 overflow-y-auto divide-y divide-[#1a2938] p-2 font-mono text-xs">
               {filtrados.map(p => (
                 <div
                   key={p.id}
                   onClick={() => onSelecionar(p)}
-                  className="p-3 hover:bg-slate-800 rounded-xl cursor-pointer flex justify-between items-center"
+                  className="p-3 hover:bg-[#111c26] rounded-xl cursor-pointer flex justify-between items-center"
                 >
                   <div>
                     <span className="font-bold text-slate-200">{p.nome}</span>
-                    <span className="block text-xs text-slate-500 font-mono">
-                      {p.codigoBarras} • Estoque: {p.estoque} {p.unidade} {p.unidade === 'KG' ? '(Balança)' : ''}
-                    </span>
+                    <span className="block text-[10px] text-slate-500">{p.codigoBarras} • Estoque: {p.estoque} {p.unidade}</span>
                   </div>
-                  <span className="text-emerald-400 font-bold font-mono">R$ {p.preco.toFixed(2)}</span>
+                  <span className="text-emerald-400 font-bold">R$ {p.preco.toFixed(2)}</span>
                 </div>
               ))}
             </div>
@@ -987,45 +1162,45 @@
 
       return (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl flex flex-col font-sans">
-            <div className="p-4 bg-slate-800 border-b border-slate-700 flex justify-between items-center">
+          <div className="w-full max-w-lg bg-[#0d1620] border border-[#1f3042] rounded-2xl overflow-hidden shadow-2xl flex flex-col font-sans">
+            <div className="p-4 bg-[#14212e] border-b border-[#1f3042] flex justify-between items-center">
               <h3 className="font-bold text-white">🔒 Gestão de Caixa (F3)</h3>
               <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
             </div>
 
-            <div className="p-6 space-y-4 font-mono text-sm">
+            <div className="p-6 space-y-4 font-mono text-xs">
               {caixaAberto ? (
                 <>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <button onClick={() => setAba('mov')} className={`p-2 rounded font-bold ${aba === 'mov' ? 'bg-sky-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Sangria / Suprimento</button>
-                    <button onClick={() => setAba('fechar')} className={`p-2 rounded font-bold ${aba === 'fechar' ? 'bg-amber-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Fechamento Cego</button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button onClick={() => setAba('mov')} className={`p-2 rounded-lg font-bold ${aba === 'mov' ? 'bg-sky-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Sangria / Suprimento</button>
+                    <button onClick={() => setAba('fechar')} className={`p-2 rounded-lg font-bold ${aba === 'fechar' ? 'bg-amber-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Fechamento Cego</button>
                   </div>
 
                   {aba === 'mov' && (
                     <div className="space-y-3 pt-2">
                       <div className="flex gap-2">
-                        <button onClick={() => setTipo('Sangria')} className={`flex-1 p-2 rounded text-xs font-bold ${tipo === 'Sangria' ? 'bg-amber-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Retirada (Sangria)</button>
-                        <button onClick={() => setTipo('Suprimento')} className={`flex-1 p-2 rounded text-xs font-bold ${tipo === 'Suprimento' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Entrada (Suprimento)</button>
+                        <button onClick={() => setTipo('Sangria')} className={`flex-1 p-2 rounded-lg font-bold ${tipo === 'Sangria' ? 'bg-amber-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Retirada (Sangria)</button>
+                        <button onClick={() => setTipo('Suprimento')} className={`flex-1 p-2 rounded-lg font-bold ${tipo === 'Suprimento' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400'}`}>Entrada (Suprimento)</button>
                       </div>
-                      <input type="number" value={val} onChange={e => setVal(parseFloat(e.target.value) || 0)} className="w-full p-2 bg-slate-950 border border-slate-700 rounded text-white" placeholder="Valor" />
-                      <input type="text" value={mot} onChange={e => setMot(e.target.value)} className="w-full p-2 bg-slate-950 border border-slate-700 rounded text-white" placeholder="Motivo" />
-                      <button onClick={() => { onMovimentacao(tipo, val, mot); setMot(''); alert('Movimentação registrada!'); }} className="w-full p-2.5 bg-sky-500 font-bold text-slate-950 rounded">Registrar Movimentação</button>
+                      <input type="number" value={val} onChange={e => setVal(parseFloat(e.target.value) || 0)} className="w-full p-2.5 bg-[#080d13] border border-[#1f3042] rounded-xl text-white" placeholder="Valor (R$)" />
+                      <input type="text" value={mot} onChange={e => setMot(e.target.value)} className="w-full p-2.5 bg-[#080d13] border border-[#1f3042] rounded-xl text-white" placeholder="Motivo da movimentação" />
+                      <button onClick={() => { onMovimentacao(tipo, val, mot); setMot(''); alert('Movimentação registrada!'); }} className="w-full p-2.5 bg-sky-600 font-bold text-white rounded-xl">Registrar Movimentação</button>
                     </div>
                   )}
 
                   {aba === 'fechar' && (
                     <div className="space-y-3 pt-2">
-                      <p className="text-xs text-amber-300">Digite o valor contado na gaveta para auditoria cega:</p>
-                      <input type="number" value={contado} onChange={e => setContado(parseFloat(e.target.value) || 0)} className="w-full p-3 bg-slate-950 border border-slate-700 rounded text-xl font-bold text-white" />
-                      <button onClick={() => onFecharCego(contado)} className="w-full p-3 bg-amber-500 font-bold text-slate-950 rounded">Conferir e Fechar Caixa</button>
+                      <p className="text-amber-300">Digite o valor contado na gaveta para auditoria cega:</p>
+                      <input type="number" value={contado} onChange={e => setContado(parseFloat(e.target.value) || 0)} className="w-full p-3 bg-[#080d13] border border-[#1f3042] rounded-xl text-xl font-bold text-white" />
+                      <button onClick={() => onFecharCego(contado)} className="w-full p-3 bg-amber-500 font-bold text-slate-950 rounded-xl">Conferir e Fechar Caixa</button>
                     </div>
                   )}
                 </>
               ) : (
                 <div className="space-y-3">
-                  <p className="text-xs text-slate-400">O caixa está fechado. Informe o fundo de troco inicial:</p>
-                  <input type="number" value={novoSaldo} onChange={e => setNovoSaldo(parseFloat(e.target.value) || 0)} className="w-full p-3 bg-slate-950 border border-slate-700 rounded text-xl font-bold text-white" />
-                  <button onClick={() => onAbrir(novoSaldo)} className="w-full p-3 bg-emerald-500 font-bold text-slate-950 rounded">Confirmar Abertura de Caixa</button>
+                  <p className="text-slate-400">O caixa está fechado. Informe o fundo de troco inicial:</p>
+                  <input type="number" value={novoSaldo} onChange={e => setNovoSaldo(parseFloat(e.target.value) || 0)} className="w-full p-3 bg-[#080d13] border border-[#1f3042] rounded-xl text-xl font-bold text-white" />
+                  <button onClick={() => onAbrir(novoSaldo)} className="w-full p-3 bg-emerald-500 font-bold text-slate-950 rounded-xl">Confirmar Abertura de Caixa</button>
                 </div>
               )}
             </div>
@@ -1037,23 +1212,23 @@
     function ModalCupomAvancadoComponent({ venda, onClose }) {
       return (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-sm bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl flex flex-col font-sans">
-            <div className="p-3 bg-slate-800 flex justify-between items-center text-xs font-bold text-white">
-              <span>🧾 Cupom Não-Fiscal</span>
+          <div className="w-full max-w-sm bg-[#0d1620] border border-[#1f3042] rounded-2xl overflow-hidden shadow-2xl flex flex-col font-sans">
+            <div className="p-3 bg-[#14212e] flex justify-between items-center text-xs font-bold text-white">
+              <span>🧾 Comprovante Térmico de Venda</span>
               <button onClick={onClose}>✕</button>
             </div>
 
             <div className="p-4 bg-slate-950 flex justify-center">
               <div id="printable-receipt" className="w-[80mm] bg-amber-50 text-slate-900 p-4 font-mono text-xs select-text border border-slate-300">
                 <div className="text-center border-b border-dashed border-slate-400 pb-2 mb-2">
-                  <div className="font-bold text-sm">PDV ATYLUS COMERCIAL</div>
+                  <div className="font-bold text-sm">HÓRUS ATYLUS COMERCIAL</div>
                   <div className="text-[10px] text-slate-600">Rua do Comércio, 1000 - Centro</div>
                   <div className="text-[10px] font-bold mt-1">*** CUPOM NÃO FISCAL ***</div>
                 </div>
 
                 <div className="text-[10px] border-b border-dashed border-slate-400 pb-2 mb-2 space-y-0.5">
                   <div>Venda: #{venda.id}</div>
-                  <div>Data: {new Date().toLocaleString()}</div>
+                  <div>Data: {new Date(venda.dataVenda).toLocaleString('pt-BR')}</div>
                   <div>Operador: {venda.operador}</div>
                   {venda.clienteNome && (
                     <div className="pt-1 text-slate-700 font-semibold border-t border-slate-200">
@@ -1088,7 +1263,7 @@
                     ))}
                     {venda.pagamentos.some(p => p.troco > 0) && (
                       <div className="flex justify-between font-bold text-slate-800 pt-0.5 border-t border-slate-200">
-                        <span>TROCO DEVOLVIDO:</span>
+                        <span>TROCO:</span>
                         <span>R$ {venda.pagamentos.find(p => p.troco > 0)?.troco.toFixed(2)}</span>
                       </div>
                     )}
@@ -1102,7 +1277,7 @@
               </div>
             </div>
 
-            <div className="p-3 bg-slate-900 border-t border-slate-800 flex justify-between text-xs font-mono">
+            <div className="p-3 bg-[#0d1620] border-t border-[#1f3042] flex justify-between text-xs font-mono">
               <button onClick={onClose} className="px-3 py-1.5 bg-slate-800 text-slate-300 rounded">[Esc] Fechar</button>
               <button onClick={() => window.print()} className="px-4 py-1.5 bg-emerald-500 font-bold text-slate-950 rounded">Imprimir Cupom</button>
             </div>

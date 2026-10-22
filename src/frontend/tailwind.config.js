@@ -5,18 +5,21 @@ export default {
   theme: {
     extend: {
       colors: {
-        retail: {
-          dark: '#0f172a',     // Slate 900
-          card: '#1e293b',     // Slate 800
-          border: '#334155',   // Slate 700
-          primary: '#10b981',  // Emerald 500 (Ação principal, Total, Sucesso)
-          secondary: '#38bdf8',// Sky 400 (Informações e atalhos)
-          accent: '#f59e0b',   // Amber 500 (Avisos, Caixa)
-          danger: '#ef4444',   // Red 500 (Cancelamentos)
+        horus: {
+          bg: '#0b1118',       // Fundo principal escuro profundo do Hórus PDV
+          card: '#111c26',     // Cartões e painéis secundários
+          surface: '#162330',  // Elementos elevados e cabeçalhos
+          border: '#1f3042',   // Bordas sutis de alta definição
+          accent: '#0284c7',   // Azul primário característico (Sky 600)
+          cyan: '#0ea5e9',     // Azul ciano de destaque (Sky 500)
+          emerald: '#10b981',  // Verde esmeralda para totais e dinheiro
+          amber: '#f59e0b',    // Âmbar para avisos e caixa
+          rose: '#f43f5e',     // Vermelho rosa para cancelamentos
         },
       },
       fontFamily: {
-        mono: ['Fira Code', 'Courier New', 'monospace'],
+        mono: ['JetBrains Mono', 'Fira Code', 'Courier New', 'monospace'],
+        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
       },
     },
   },
