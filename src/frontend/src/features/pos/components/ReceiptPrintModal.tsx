@@ -36,7 +36,7 @@ export const ReceiptPrintModal: React.FC<ReceiptPrintModalProps> = ({ venda, onC
           >
             {/* Cabeçalho do Cupom */}
             <div className="text-center border-b border-dashed border-slate-400 pb-2 mb-2">
-              <h1 className="font-extrabold text-sm tracking-wider">PDV ATYLUS COMERCIAL</h1>
+              <h1 className="font-extrabold text-sm tracking-wider">ATYLUS PDV COMERCIAL</h1>
               <p className="text-[10px] text-slate-600">Rua do Comércio, 1000 - Centro</p>
               <p className="text-[10px] text-slate-600">CNPJ: 00.000.000/0001-00</p>
               <p className="text-[10px] font-bold mt-1">*** CUPOM NÃO FISCAL ***</p>

@@ -15,7 +15,7 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "   Hórus Atylus PDV - Pipeline de Build Desktop (Tauri v2) " -ForegroundColor Cyan
+Write-Host "       ATYLUS PDV - Pipeline de Build Desktop (Tauri v2)   " -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
 
 # 1. Configurar variáveis de PATH locais

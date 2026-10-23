@@ -218,7 +218,10 @@ export const POSView: React.FC<POSViewProps> = ({ onAbrirImportador }) => {
     const balancaResult = decodificarCodigoBarras(codigo);
     if (balancaResult.isBalanca) {
       try {
-        const produto = await pdvApi.buscarProdutoPorCodigo(balancaResult.codigoProduto);
+        let produto = await pdvApi.buscarProdutoPorCodigo(balancaResult.codigoProduto);
+        if (!produto) {
+          produto = await pdvApi.buscarProdutoPorCodigo(balancaResult.codigoProdutoPadrao);
+        }
         if (produto) {
           // Se o valor foi embutido, calcula a quantidade fracionada em kg
           if (balancaResult.tipoEmbutido === 'preco' && balancaResult.valorOuPesoEmbutido) {
@@ -263,7 +266,7 @@ export const POSView: React.FC<POSViewProps> = ({ onAbrirImportador }) => {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <span className="w-3.5 h-3.5 rounded-full bg-emerald-500 shadow-md shadow-emerald-500/50" />
-            <span className="font-black text-lg text-white tracking-wider font-mono">PDV ATYLUS</span>
+            <span className="font-black text-lg text-white tracking-wider font-mono">ATYLUS PDV</span>
           </div>
 
           <button

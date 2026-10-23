@@ -40,7 +40,7 @@ export const App: React.FC = () => {
 
       {/* 2. Área de Trabalho Principal com Sidebar Colapsável */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Menu Lateral Estilo Hórus PDV */}
+        {/* Menu Lateral Atylus PDV */}
         <Sidebar
           moduloAtivo={moduloAtivo}
           onSelecionarModulo={handleSelecionarModulo}

@@ -32,10 +32,10 @@ export const DesktopTitlebar: React.FC = () => {
     <div className="h-8 bg-[#070c12] border-b border-[#162330] flex items-center justify-between px-3 select-none text-xs font-mono text-slate-400 z-50">
       {/* Lado Esquerdo: Identidade do Software */}
       <div className="flex items-center gap-2">
-        <div className="w-2.5 h-2.5 rounded-full bg-sky-500 shadow-sm shadow-sky-500/50" />
-        <span className="font-extrabold text-slate-200 tracking-wider">HÓRUS ATYLUS PDV</span>
-        <span className="text-[10px] text-slate-600 bg-slate-900 px-1.5 py-0.2 rounded border border-slate-800">
-          v2.4 Desktop
+        <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50" />
+        <span className="font-extrabold text-slate-100 tracking-wider">ATYLUS PDV</span>
+        <span className="text-[10px] text-emerald-400 bg-emerald-950/60 px-1.5 py-0.2 rounded border border-emerald-900/50">
+          Desktop Pro
         </span>
       </div>
 

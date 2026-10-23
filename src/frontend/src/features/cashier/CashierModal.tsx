@@ -12,16 +12,16 @@ export const CashierModal: React.FC<CashierModalProps> = ({ isOpen, onClose }) =
   const { caixa, abrirCaixa, registrarMovimentacao, fecharCaixaCego } = useCashierStore();
   const operador = useAuthStore(state => state.operador);
 
-  const [aba, setAba] = useState<'status' | 'abrir' | 'movimentacao' | 'fechar'>('status');
+  const [aba, setAba] = useState<'status' | 'abrir' | 'sangria' | 'suprimento' | 'fechar'>('status');
 
   // Form states
   const [saldoInicial, setSaldoInicial] = useState<number>(100);
-  const [tipoMov, setTipoMov] = useState<'Suprimento' | 'Sangria'>('Sangria');
   const [valorMov, setValorMov] = useState<number>(50);
   const [motivoMov, setMotivoMov] = useState('');
   const [saldoContado, setSaldoContado] = useState<number>(0);
   const [obsFechamento, setObsFechamento] = useState('');
   const [resultadoFechamento, setResultadoFechamento] = useState<any>(null);
+  const [sucessoMsg, setSucessoMsg] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -29,13 +29,18 @@ export const CashierModal: React.FC<CashierModalProps> = ({ isOpen, onClose }) =
 
   const handleAbrir = async () => {
     await abrirCaixa(operador.id, saldoInicial);
+    setSucessoMsg('Caixa aberto com sucesso com fundo de troco inicial!');
+    setTimeout(() => setSucessoMsg(null), 3000);
     setAba('status');
   };
 
-  const handleMovimentacao = async () => {
+  const handleExecutarMovimentacao = async (tipo: 'Sangria' | 'Suprimento') => {
     if (valorMov <= 0 || !motivoMov) return;
-    await registrarMovimentacao(tipoMov, valorMov, motivoMov, operador.id);
+    await registrarMovimentacao(tipo, valorMov, motivoMov, operador.id);
+    setSucessoMsg(`${tipo} de R$ ${valorMov.toFixed(2)} registrada e comprovante emitido!`);
+    setTimeout(() => setSucessoMsg(null), 3500);
     setMotivoMov('');
+    setValorMov(50);
     setAba('status');
   };
 
@@ -54,7 +59,7 @@ export const CashierModal: React.FC<CashierModalProps> = ({ isOpen, onClose }) =
               {isAberto ? <Unlock className="w-5 h-5" /> : <Lock className="w-5 h-5" />}
             </div>
             <div>
-              <h2 className="text-xl font-bold text-white">Controle de Caixa (F3)</h2>
+              <h2 className="text-xl font-bold text-white">Central de Caixa (F2) — ATYLUS PDV</h2>
               <p className="text-xs text-slate-400">
                 Status: <strong className={isAberto ? 'text-emerald-400' : 'text-red-400'}>{isAberto ? 'ABERTO' : 'FECHADO'}</strong> • Operador: {operador.nome}
               </p>
@@ -65,11 +70,19 @@ export const CashierModal: React.FC<CashierModalProps> = ({ isOpen, onClose }) =
           </button>
         </div>
 
-        {/* Abas */}
-        <div className="flex border-b border-slate-800 bg-slate-900/60 p-2 gap-2">
+        {/* Mensagem de Sucesso Flutuante */}
+        {sucessoMsg && (
+          <div className="px-5 py-2.5 bg-emerald-950/70 border-b border-emerald-800 text-emerald-300 text-xs font-mono flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <span>{sucessoMsg}</span>
+          </div>
+        )}
+
+        {/* Abas Estilo PDVOpen */}
+        <div className="flex border-b border-slate-800 bg-slate-900/60 p-2 gap-1.5 overflow-x-auto">
           <button
             onClick={() => setAba('status')}
-            className={`flex-1 py-2 rounded-xl text-xs font-mono font-bold transition ${aba === 'status' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white'}`}
+            className={`px-3 py-2 rounded-xl text-xs font-mono font-bold transition flex items-center gap-1.5 ${aba === 'status' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white'}`}
           >
             Visão Geral
           </button>
@@ -86,16 +99,22 @@ export const CashierModal: React.FC<CashierModalProps> = ({ isOpen, onClose }) =
           {isAberto && (
             <>
               <button
-                onClick={() => setAba('movimentacao')}
-                className={`flex-1 py-2 rounded-xl text-xs font-mono font-bold transition ${aba === 'movimentacao' ? 'bg-sky-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                onClick={() => setAba('sangria')}
+                className={`flex-1 py-2 rounded-xl text-xs font-mono font-bold transition flex items-center justify-center gap-1.5 ${aba === 'sangria' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-amber-400'}`}
               >
-                Sangria / Suprimento
+                <ArrowUpRight className="w-3.5 h-3.5" /> Sangria (Retirada)
+              </button>
+              <button
+                onClick={() => setAba('suprimento')}
+                className={`flex-1 py-2 rounded-xl text-xs font-mono font-bold transition flex items-center justify-center gap-1.5 ${aba === 'suprimento' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-emerald-400'}`}
+              >
+                <ArrowDownRight className="w-3.5 h-3.5" /> Suprimento (Troco)
               </button>
               <button
                 onClick={() => { setAba('fechar'); setResultadoFechamento(null); }}
-                className={`flex-1 py-2 rounded-xl text-xs font-mono font-bold transition ${aba === 'fechar' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                className={`flex-1 py-2 rounded-xl text-xs font-mono font-bold transition flex items-center justify-center gap-1.5 ${aba === 'fechar' ? 'bg-red-600/90 text-white' : 'text-slate-400 hover:text-red-400'}`}
               >
-                Fechamento Cego
+                <Calculator className="w-3.5 h-3.5" /> Fechamento Cego
               </button>
             </>
           )}
@@ -122,7 +141,7 @@ export const CashierModal: React.FC<CashierModalProps> = ({ isOpen, onClose }) =
 
               {/* Histórico Recente de Sangrias e Suprimentos */}
               <div className="mt-4">
-                <h4 className="text-xs font-bold font-mono text-slate-400 mb-2 uppercase">Movimentações do Turno:</h4>
+                <h4 className="text-xs font-bold font-mono text-slate-400 mb-2 uppercase">Histórico de Sangrias e Suprimentos do Turno:</h4>
                 <div className="max-h-48 overflow-y-auto divide-y divide-slate-800 border border-slate-800 rounded-xl bg-slate-950">
                   {caixa?.movimentacoes && caixa.movimentacoes.length > 0 ? (
                     caixa.movimentacoes.map(m => (
@@ -143,7 +162,7 @@ export const CashierModal: React.FC<CashierModalProps> = ({ isOpen, onClose }) =
                       </div>
                     ))
                   ) : (
-                    <div className="p-4 text-center text-slate-500 text-xs">Nenhuma movimentação registrada.</div>
+                    <div className="p-4 text-center text-slate-500 text-xs">Nenhuma sangria ou suprimento registrado até o momento.</div>
                   )}
                 </div>
               </div>
@@ -175,54 +194,82 @@ export const CashierModal: React.FC<CashierModalProps> = ({ isOpen, onClose }) =
             </div>
           )}
 
-          {aba === 'movimentacao' && (
+          {aba === 'sangria' && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setTipoMov('Sangria')}
-                  className={`py-3 rounded-xl font-bold text-xs uppercase border transition flex items-center justify-center gap-2 ${tipoMov === 'Sangria' ? 'bg-amber-600 text-white border-amber-500' : 'bg-slate-800 text-slate-400 border-slate-700'}`}
-                >
-                  <ArrowUpRight className="w-4 h-4" /> Sangria (Retirada)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTipoMov('Suprimento')}
-                  className={`py-3 rounded-xl font-bold text-xs uppercase border transition flex items-center justify-center gap-2 ${tipoMov === 'Suprimento' ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-slate-800 text-slate-400 border-slate-700'}`}
-                >
-                  <ArrowDownRight className="w-4 h-4" /> Suprimento (Entrada)
-                </button>
+              <div className="p-3 bg-amber-950/40 border border-amber-800/60 rounded-xl text-xs text-amber-300">
+                <strong>Sangria de Caixa:</strong> Retirada de numerário em dinheiro da gaveta por segurança (ex: envio para cofre ou sangria preventiva).
               </div>
 
               <div>
-                <label className="block text-xs font-mono text-slate-400 mb-1.5 uppercase">Valor da Movimentação (R$)</label>
+                <label className="block text-xs font-mono text-slate-400 mb-1.5 uppercase">Valor a Retirar (R$)</label>
                 <input
                   type="number"
                   step="0.01"
                   min="0"
                   value={valorMov}
                   onChange={e => setValorMov(parseFloat(e.target.value) || 0)}
-                  className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-xl font-bold font-mono text-white focus:outline-none focus:border-sky-500"
+                  className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-2xl font-bold font-mono text-amber-400 focus:outline-none focus:border-amber-500"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-mono text-slate-400 mb-1.5 uppercase">Motivo / Justificativa</label>
+                <label className="block text-xs font-mono text-slate-400 mb-1.5 uppercase">Motivo / Destino da Sangria</label>
                 <input
                   type="text"
-                  placeholder="Ex: Sangria para cofre de segurança"
+                  placeholder="Ex: Recolhimento de excesso para o cofre central"
                   value={motivoMov}
                   onChange={e => setMotivoMov(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-sky-500"
+                  className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-amber-500"
                 />
               </div>
 
               <button
                 disabled={valorMov <= 0 || !motivoMov}
-                onClick={handleMovimentacao}
-                className="w-full py-3.5 bg-sky-500 hover:bg-sky-400 disabled:opacity-50 text-slate-950 font-bold rounded-xl transition"
+                onClick={() => handleExecutarMovimentacao('Sangria')}
+                className="w-full py-3.5 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-bold rounded-xl transition flex items-center justify-center gap-2"
               >
-                Registrar Movimentação
+                <ArrowUpRight className="w-5 h-5" />
+                <span>Confirmar e Emitir Comprovante de Sangria</span>
+              </button>
+            </div>
+          )}
+
+          {aba === 'suprimento' && (
+            <div className="space-y-4">
+              <div className="p-3 bg-emerald-950/40 border border-emerald-800/60 rounded-xl text-xs text-emerald-300">
+                <strong>Suprimento de Caixa:</strong> Entrada extra de dinheiro na gaveta durante o turno (ex: reforço de troco ou moedas).
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-slate-400 mb-1.5 uppercase">Valor do Suprimento (R$)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={valorMov}
+                  onChange={e => setValorMov(parseFloat(e.target.value) || 0)}
+                  className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-2xl font-bold font-mono text-emerald-400 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-slate-400 mb-1.5 uppercase">Motivo / Origem do Suprimento</label>
+                <input
+                  type="text"
+                  placeholder="Ex: Reforço de troco em moedas de 1 real"
+                  value={motivoMov}
+                  onChange={e => setMotivoMov(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <button
+                disabled={valorMov <= 0 || !motivoMov}
+                onClick={() => handleExecutarMovimentacao('Suprimento')}
+                className="w-full py-3.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-bold rounded-xl transition flex items-center justify-center gap-2"
+              >
+                <ArrowDownRight className="w-5 h-5" />
+                <span>Confirmar e Registrar Suprimento</span>
               </button>
             </div>
           )}

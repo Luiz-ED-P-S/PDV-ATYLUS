@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "HorusAtylusPDV",
+  "productName": "AtylusPDV",
   "version": "1.0.0",
-  "identifier": "com.atylus.horuspdv",
+  "identifier": "com.atylus.pdv",
   "build": {
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Hórus Atylus PDV",
+        "title": "ATYLUS PDV",
         "width": 1400,
         "height": 900,
         "minWidth": 1024,
@@ -39,7 +39,7 @@
     "externalBin": [
       "binaries/pdv-api"
     ],
-    "copyright": "Hórus Atylus PDV 2026",
+    "copyright": "ATYLUS PDV 2026",
     "category": "Business",
     "shortDescription": "Sistema de Frente de Caixa Moderno e Offline-First",
     "windows": {

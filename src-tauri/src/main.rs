@@ -33,5 +33,5 @@ fn main() {
       Ok(())
     })
     .run(tauri::generate_context!())
-    .expect("Erro ao executar aplicação Hórus Atylus PDV");
+    .expect("Erro ao executar aplicação ATYLUS PDV");
 }

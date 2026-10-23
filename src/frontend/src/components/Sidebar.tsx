@@ -50,12 +50,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="p-3 border-b border-[#1a2938] flex items-center justify-between">
           {!colapsada && (
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 font-bold font-mono">
-                H
+              <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold font-mono">
+                A
               </div>
               <div>
-                <span className="font-extrabold text-sm text-white tracking-wide block">HÓRUS PDV</span>
-                <span className="text-[10px] text-slate-500 font-mono">Painel Comercial</span>
+                <span className="font-extrabold text-sm text-white tracking-wide block">ATYLUS PDV</span>
+                <span className="text-[10px] text-slate-500 font-mono">Frente de Caixa</span>
               </div>
             </div>
           )}
