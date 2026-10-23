@@ -83,20 +83,27 @@ if (app.Environment.IsDevelopment())
 app.UseCors("AllowLocalhost");
 
 // Suporte para servir a SPA React compilada a partir de wwwroot (com detecção flexível de caminho)
-var wwwrootDir = Path.Combine(AppContext.BaseDirectory, "wwwroot");
-if (!Directory.Exists(wwwrootDir))
+string? wwwrootDir = Environment.GetEnvironmentVariable("PDV_WWWROOT");
+
+if (string.IsNullOrWhiteSpace(wwwrootDir) || !Directory.Exists(wwwrootDir))
 {
-    var altPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../wwwroot"));
-    if (Directory.Exists(altPath)) wwwrootDir = altPath;
-    else
+    var candidates = new List<string?>
     {
-        var localPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
-        if (Directory.Exists(localPath)) wwwrootDir = localPath;
-    }
+        Path.Combine(AppContext.BaseDirectory, "wwwroot"),
+        Environment.ProcessPath != null ? Path.Combine(Path.GetDirectoryName(Environment.ProcessPath)!, "wwwroot") : null,
+        Environment.ProcessPath != null ? Path.GetFullPath(Path.Combine(Path.GetDirectoryName(Environment.ProcessPath)!, "../../src/backend/PDV.API/wwwroot")) : null,
+        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../wwwroot")),
+        Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"),
+        Path.Combine(Directory.GetCurrentDirectory(), "src/backend/PDV.API/wwwroot"),
+        @"c:\Users\Luiz Ed\OneDrive\Documentos\PDV-ATYLUS\src\backend\PDV.API\wwwroot"
+    };
+
+    wwwrootDir = candidates.FirstOrDefault(p => !string.IsNullOrEmpty(p) && Directory.Exists(p) && File.Exists(Path.Combine(p, "index.html")));
 }
 
-if (Directory.Exists(wwwrootDir))
+if (!string.IsNullOrEmpty(wwwrootDir) && Directory.Exists(wwwrootDir))
 {
+    Console.WriteLine($"[SPA] Servindo frontend de: {wwwrootDir}");
     var physicalProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(wwwrootDir);
     app.UseDefaultFiles(new DefaultFilesOptions { FileProvider = physicalProvider });
     app.UseStaticFiles(new StaticFileOptions { FileProvider = physicalProvider });
@@ -114,7 +121,7 @@ app.MapControllers();
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", version = "1.0.0", timestamp = DateTime.UtcNow }));
 
 // Fallback para SPA React (roteamento no cliente)
-if (Directory.Exists(wwwrootDir) && File.Exists(Path.Combine(wwwrootDir, "index.html")))
+if (!string.IsNullOrEmpty(wwwrootDir) && Directory.Exists(wwwrootDir) && File.Exists(Path.Combine(wwwrootDir, "index.html")))
 {
     var physicalProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(wwwrootDir);
     app.MapFallbackToFile("index.html", new StaticFileOptions { FileProvider = physicalProvider });
