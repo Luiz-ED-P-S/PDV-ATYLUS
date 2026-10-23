@@ -49,6 +49,12 @@ pnpm-debug.log*
 .env.local
 .env.*.local
 
+# Tauri Desktop Build & Sidecars
+src-tauri/target/
+src-tauri/binaries/
+*.msi
+*.exe
+
 # OS Generated
 Thumbs.db
 ehthumbs.db

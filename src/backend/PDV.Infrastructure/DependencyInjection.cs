@@ -12,7 +12,29 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        var connectionString = configuration.GetConnectionString("DefaultConnection") ?? "Data Source=pdv.db;Cache=Shared";
+        string connectionString;
+        var configuredConn = configuration.GetConnectionString("DefaultConnection");
+
+        var customDataDir = Environment.GetEnvironmentVariable("PDV_DATA_DIR");
+        var isDesktopMode = Environment.GetEnvironmentVariable("PDV_DESKTOP_MODE") == "1";
+
+        if (!string.IsNullOrWhiteSpace(customDataDir))
+        {
+            Directory.CreateDirectory(customDataDir);
+            var dbPath = Path.Combine(customDataDir, "pdv.db");
+            connectionString = $"Data Source={dbPath};Cache=Shared";
+        }
+        else if (isDesktopMode)
+        {
+            var appDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "PDV-ATYLUS");
+            Directory.CreateDirectory(appDataDir);
+            var dbPath = Path.Combine(appDataDir, "pdv.db");
+            connectionString = $"Data Source={dbPath};Cache=Shared";
+        }
+        else
+        {
+            connectionString = configuredConn ?? "Data Source=pdv.db;Cache=Shared";
+        }
 
         services.AddDbContext<PdvDbContext>(options =>
         {
