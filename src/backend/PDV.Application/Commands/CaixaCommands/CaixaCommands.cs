@@ -21,10 +21,12 @@ public class AbrirCaixaCommandValidator : AbstractValidator<AbrirCaixaCommand>
 public class AbrirCaixaCommandHandler : IRequestHandler<AbrirCaixaCommand, CaixaDto>
 {
     private readonly ICaixaRepository _caixaRepository;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public AbrirCaixaCommandHandler(ICaixaRepository caixaRepository)
+    public AbrirCaixaCommandHandler(ICaixaRepository caixaRepository, IUnitOfWork unitOfWork)
     {
         _caixaRepository = caixaRepository;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<CaixaDto> Handle(AbrirCaixaCommand request, CancellationToken cancellationToken)
@@ -35,6 +37,7 @@ public class AbrirCaixaCommandHandler : IRequestHandler<AbrirCaixaCommand, Caixa
 
         var novoCaixa = new Caixa(request.OperadorId, request.SaldoInicial);
         await _caixaRepository.AdicionarAsync(novoCaixa, cancellationToken);
+        await _unitOfWork.CommitAsync(cancellationToken);
 
         return CaixaDto.FromEntity(novoCaixa);
     }
@@ -50,10 +53,12 @@ public record RegistrarMovimentacaoCommand(
 public class RegistrarMovimentacaoCommandHandler : IRequestHandler<RegistrarMovimentacaoCommand, MovimentacaoCaixaDto>
 {
     private readonly ICaixaRepository _caixaRepository;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public RegistrarMovimentacaoCommandHandler(ICaixaRepository caixaRepository)
+    public RegistrarMovimentacaoCommandHandler(ICaixaRepository caixaRepository, IUnitOfWork unitOfWork)
     {
         _caixaRepository = caixaRepository;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<MovimentacaoCaixaDto> Handle(RegistrarMovimentacaoCommand request, CancellationToken cancellationToken)
@@ -64,6 +69,7 @@ public class RegistrarMovimentacaoCommandHandler : IRequestHandler<RegistrarMovi
 
         caixa.AdicionarMovimentacao(request.Tipo, request.Valor, request.Motivo, request.OperadorId);
         await _caixaRepository.AtualizarAsync(caixa, cancellationToken);
+        await _unitOfWork.CommitAsync(cancellationToken);
 
         var mov = caixa.Movimentacoes.Last();
         return new MovimentacaoCaixaDto(mov.Id, mov.Tipo, mov.Valor, mov.Motivo, mov.OperadorId, mov.DataHora);
@@ -80,15 +86,18 @@ public class FecharCaixaCegoCommandHandler : IRequestHandler<FecharCaixaCegoComm
     private readonly ICaixaRepository _caixaRepository;
     private readonly IVendaRepository _vendaRepository;
     private readonly IGoogleDriveBackupService _googleDriveBackupService;
+    private readonly IUnitOfWork _unitOfWork;
 
     public FecharCaixaCegoCommandHandler(
         ICaixaRepository caixaRepository,
         IVendaRepository vendaRepository,
-        IGoogleDriveBackupService googleDriveBackupService)
+        IGoogleDriveBackupService googleDriveBackupService,
+        IUnitOfWork unitOfWork)
     {
         _caixaRepository = caixaRepository;
         _vendaRepository = vendaRepository;
         _googleDriveBackupService = googleDriveBackupService;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<FechamentoCegoResultadoDto> Handle(FecharCaixaCegoCommand request, CancellationToken cancellationToken)
@@ -113,6 +122,7 @@ public class FecharCaixaCegoCommandHandler : IRequestHandler<FecharCaixaCegoComm
 
         caixa.FecharCego(request.SaldoInformado, request.Observacoes);
         await _caixaRepository.AtualizarAsync(caixa, cancellationToken);
+        await _unitOfWork.CommitAsync(cancellationToken);
 
         // Dispara backup automático no Google Drive ao fechar o caixa
         try

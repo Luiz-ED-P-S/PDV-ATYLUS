@@ -142,6 +142,8 @@ export const pdvApi = {
   async criarVenda(vendaData: {
     operadorId: string;
     desconto: number;
+    clienteNome?: string;
+    clienteDocumento?: string;
     itens: { produtoId: string; quantidade: number; precoUnitario: number }[];
     pagamentos: { formaPagamento: number; valor: number; troco: number; txId?: string }[];
   }): Promise<Venda> {
@@ -154,6 +156,8 @@ export const pdvApi = {
         id: 'venda-' + Date.now(),
         caixaId: mockCaixa?.id || 'caixa-mock',
         operadorId: vendaData.operadorId,
+        clienteNome: vendaData.clienteNome,
+        clienteDocumento: vendaData.clienteDocumento,
         dataVenda: new Date().toISOString(),
         valorTotal: total,
         desconto: vendaData.desconto,

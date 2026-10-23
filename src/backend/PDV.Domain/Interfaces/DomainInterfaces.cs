@@ -3,6 +3,14 @@ using PDV.Domain.Enums;
 
 namespace PDV.Domain.Interfaces;
 
+public interface IUnitOfWork
+{
+    Task<int> CommitAsync(CancellationToken cancellationToken = default);
+    Task BeginTransactionAsync(CancellationToken cancellationToken = default);
+    Task CommitTransactionAsync(CancellationToken cancellationToken = default);
+    Task RollbackTransactionAsync(CancellationToken cancellationToken = default);
+}
+
 public interface IRepository<T> where T : BaseEntity
 {
     Task<T?> ObterPorIdAsync(Guid id, CancellationToken cancellationToken = default);
@@ -10,6 +18,12 @@ public interface IRepository<T> where T : BaseEntity
     Task AdicionarAsync(T entity, CancellationToken cancellationToken = default);
     Task AtualizarAsync(T entity, CancellationToken cancellationToken = default);
     Task RemoverAsync(T entity, CancellationToken cancellationToken = default);
+}
+
+public interface IOperadorRepository : IRepository<Operador>
+{
+    Task<Operador?> ObterPorMatriculaAsync(string matricula, CancellationToken cancellationToken = default);
+    Task<List<Operador>> ObterSupervisoresAtivosAsync(CancellationToken cancellationToken = default);
 }
 
 public interface IProdutoRepository : IRepository<Produto>

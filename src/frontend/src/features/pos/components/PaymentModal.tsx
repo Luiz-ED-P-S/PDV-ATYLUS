@@ -114,6 +114,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onV
       const venda = await pdvApi.criarVenda({
         operadorId: operador.id,
         desconto,
+        clienteNome: clienteNome || undefined,
+        clienteDocumento: clienteDoc || undefined,
         itens: itens.map(i => ({
           produtoId: i.produtoId,
           quantidade: i.quantidade,

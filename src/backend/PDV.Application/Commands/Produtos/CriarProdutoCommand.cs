@@ -30,10 +30,12 @@ public class CriarProdutoCommandValidator : AbstractValidator<CriarProdutoComman
 public class CriarProdutoCommandHandler : IRequestHandler<CriarProdutoCommand, ProdutoDto>
 {
     private readonly IProdutoRepository _produtoRepository;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public CriarProdutoCommandHandler(IProdutoRepository produtoRepository)
+    public CriarProdutoCommandHandler(IProdutoRepository produtoRepository, IUnitOfWork unitOfWork)
     {
         _produtoRepository = produtoRepository;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<ProdutoDto> Handle(CriarProdutoCommand request, CancellationToken cancellationToken)
@@ -51,6 +53,7 @@ public class CriarProdutoCommandHandler : IRequestHandler<CriarProdutoCommand, P
             request.EstoqueMinimo);
 
         await _produtoRepository.AdicionarAsync(produto, cancellationToken);
+        await _unitOfWork.CommitAsync(cancellationToken);
 
         return ProdutoDto.FromEntity(produto);
     }

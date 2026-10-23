@@ -78,13 +78,14 @@ public class ThermalPrinterService : IThermalPrinterService
                .Divisor('=');
 
         // Identificação do Documento
+        var dataLocal = venda.DataVenda.ToLocalTime();
         builder.AlinharCentro()
                .Negrito(true)
                .Linha("COMPROVANTE DE VENDA - NÃO FISCAL")
                .Negrito(false)
                .AlinharEsquerda()
                .Linha($"Venda: #{venda.Id.ToString()[..8].ToUpper()}")
-               .Linha($"Data/Hora: {venda.DataVenda:dd/MM/yyyy HH:mm:ss}")
+               .Linha($"Data/Hora: {dataLocal:dd/MM/yyyy HH:mm:ss}")
                .Linha($"Operador : {venda.OperadorId}");
 
         if (!string.IsNullOrWhiteSpace(venda.ClienteNome))
@@ -184,6 +185,8 @@ public class ThermalPrinterService : IThermalPrinterService
         config ??= _configPadrao;
         var builder = new EscPosBuilder(config.Largura);
 
+        var dataAberturaLocal = caixa.DataAbertura.ToLocalTime();
+        var dataFechamentoLocal = caixa.DataFechamento?.ToLocalTime();
         builder.AlinharCentro()
                .TamanhoDuplo(true)
                .Negrito(true)
@@ -195,8 +198,8 @@ public class ThermalPrinterService : IThermalPrinterService
                .AlinharEsquerda()
                .Linha($"Caixa ID   : {caixa.Id.ToString()[..8].ToUpper()}")
                .Linha($"Operador   : {caixa.OperadorId}")
-               .Linha($"Abertura   : {caixa.DataAbertura:dd/MM/yyyy HH:mm:ss}")
-               .Linha($"Fechamento : {(caixa.DataFechamento.HasValue ? caixa.DataFechamento.Value.ToString("dd/MM/yyyy HH:mm:ss") : "Aberto")}")
+               .Linha($"Abertura   : {dataAberturaLocal:dd/MM/yyyy HH:mm:ss}")
+               .Linha($"Fechamento : {(dataFechamentoLocal.HasValue ? dataFechamentoLocal.Value.ToString("dd/MM/yyyy HH:mm:ss") : "Aberto")}")
                .Divisor('-');
 
         // Totais Financeiros
@@ -264,7 +267,7 @@ public class ThermalPrinterService : IThermalPrinterService
                .Negrito(false)
                .Divisor('=')
                .AlinharEsquerda()
-               .Linha($"Data/Hora: {mov.DataHora:dd/MM/yyyy HH:mm:ss}")
+               .Linha($"Data/Hora: {mov.DataHora.ToLocalTime():dd/MM/yyyy HH:mm:ss}")
                .Linha($"Caixa ID : {caixa.Id.ToString()[..8].ToUpper()}")
                .Linha($"Operador : {mov.OperadorId}")
                .Linha($"Motivo   : {mov.Motivo}")

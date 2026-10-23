@@ -13,8 +13,8 @@ public class Venda : BaseEntity
     public decimal ValorLiquido => Math.Max(0, ValorTotal - Desconto);
     public StatusVenda Status { get; private set; } = StatusVenda.Concluida;
     public string? MotivoCancelamento { get; private set; }
-    public string? ClienteNome { get; set; }
-    public string? ClienteDocumento { get; set; }
+    public string? ClienteNome { get; private set; }
+    public string? ClienteDocumento { get; private set; }
 
     private readonly List<ItemVenda> _itens = new();
     public IReadOnlyCollection<ItemVenda> Itens => _itens.AsReadOnly();
@@ -24,7 +24,7 @@ public class Venda : BaseEntity
 
     protected Venda() { }
 
-    public Venda(Guid caixaId, string operadorId, decimal desconto = 0)
+    public Venda(Guid caixaId, string operadorId, decimal desconto = 0, string? clienteNome = null, string? clienteDocumento = null)
     {
         if (caixaId == Guid.Empty)
             throw new DomainException("O identificador do caixa é obrigatório para registrar uma venda.");
@@ -37,6 +37,18 @@ public class Venda : BaseEntity
         DataVenda = DateTime.UtcNow;
         Desconto = desconto;
         Status = StatusVenda.Concluida;
+        ClienteNome = string.IsNullOrWhiteSpace(clienteNome) ? null : clienteNome.Trim();
+        ClienteDocumento = string.IsNullOrWhiteSpace(clienteDocumento) ? null : clienteDocumento.Trim();
+    }
+
+    public void AssociarCliente(string? nome, string? documento)
+    {
+        if (Status == StatusVenda.Cancelada)
+            throw new DomainException("Não é possível associar cliente a uma venda cancelada.");
+
+        ClienteNome = string.IsNullOrWhiteSpace(nome) ? null : nome.Trim();
+        ClienteDocumento = string.IsNullOrWhiteSpace(documento) ? null : documento.Trim();
+        RegistrarAtualizacao();
     }
 
     public void AdicionarItem(Guid produtoId, string produtoNome, string codigoBarras, decimal quantidade, decimal precoUnitario)

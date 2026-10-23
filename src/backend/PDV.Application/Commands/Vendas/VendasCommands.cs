@@ -23,7 +23,9 @@ public record CriarVendaCommand(
     string OperadorId,
     decimal Desconto,
     List<CriarVendaItemInput> Itens,
-    List<CriarVendaPagamentoInput> Pagamentos) : IRequest<VendaDto>;
+    List<CriarVendaPagamentoInput> Pagamentos,
+    string? ClienteNome = null,
+    string? ClienteDocumento = null) : IRequest<VendaDto>;
 
 public class CriarVendaCommandValidator : AbstractValidator<CriarVendaCommand>
 {
@@ -50,15 +52,18 @@ public class CriarVendaCommandHandler : IRequestHandler<CriarVendaCommand, Venda
     private readonly IVendaRepository _vendaRepository;
     private readonly ICaixaRepository _caixaRepository;
     private readonly IProdutoRepository _produtoRepository;
+    private readonly IUnitOfWork _unitOfWork;
 
     public CriarVendaCommandHandler(
         IVendaRepository vendaRepository,
         ICaixaRepository caixaRepository,
-        IProdutoRepository produtoRepository)
+        IProdutoRepository produtoRepository,
+        IUnitOfWork unitOfWork)
     {
         _vendaRepository = vendaRepository;
         _caixaRepository = caixaRepository;
         _produtoRepository = produtoRepository;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<VendaDto> Handle(CriarVendaCommand request, CancellationToken cancellationToken)
@@ -67,41 +72,52 @@ public class CriarVendaCommandHandler : IRequestHandler<CriarVendaCommand, Venda
         if (caixaAberto == null)
             throw new DomainException("Não é possível realizar vendas: nenhum caixa está aberto no momento. Abra o caixa primeiro [F3].");
 
-        var venda = new Venda(caixaAberto.Id, request.OperadorId, request.Desconto);
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
 
-        // Processa e debita os itens do estoque
-        foreach (var itemInput in request.Itens)
+        try
         {
-            var produto = await _produtoRepository.ObterPorIdAsync(itemInput.ProdutoId, cancellationToken);
-            if (produto == null)
-                throw new DomainException($"Produto de ID '{itemInput.ProdutoId}' não foi localizado no catálogo.");
+            var venda = new Venda(caixaAberto.Id, request.OperadorId, request.Desconto, request.ClienteNome, request.ClienteDocumento);
 
-            produto.DebitarEstoque(itemInput.Quantidade);
-            await _produtoRepository.AtualizarAsync(produto, cancellationToken);
+            // Processa e debita os itens do estoque
+            foreach (var itemInput in request.Itens)
+            {
+                var produto = await _produtoRepository.ObterPorIdAsync(itemInput.ProdutoId, cancellationToken);
+                if (produto == null)
+                    throw new DomainException($"Produto de ID '{itemInput.ProdutoId}' não foi localizado no catálogo.");
 
-            venda.AdicionarItem(
-                produto.Id,
-                produto.Nome,
-                produto.CodigoBarras,
-                itemInput.Quantidade,
-                itemInput.PrecoUnitario);
+                produto.DebitarEstoque(itemInput.Quantidade);
+                await _produtoRepository.AtualizarAsync(produto, cancellationToken);
+
+                venda.AdicionarItem(
+                    produto.Id,
+                    produto.Nome,
+                    produto.CodigoBarras,
+                    itemInput.Quantidade,
+                    itemInput.PrecoUnitario);
+            }
+
+            // Processa os pagamentos
+            foreach (var pag in request.Pagamentos)
+            {
+                venda.AdicionarPagamento(pag.FormaPagamento, pag.Valor, pag.Troco, pag.TxId);
+            }
+
+            var totalPagoSemTroco = request.Pagamentos.Sum(p => p.Valor - p.Troco);
+            if (totalPagoSemTroco < venda.ValorLiquido)
+            {
+                throw new DomainException($"Total recebido (R$ {totalPagoSemTroco:F2}) é insuficiente para cobrir o valor líquido da venda (R$ {venda.ValorLiquido:F2}).");
+            }
+
+            await _vendaRepository.AdicionarAsync(venda, cancellationToken);
+            await _unitOfWork.CommitTransactionAsync(cancellationToken);
+
+            return VendaDto.FromEntity(venda);
         }
-
-        // Processa os pagamentos
-        foreach (var pag in request.Pagamentos)
+        catch
         {
-            venda.AdicionarPagamento(pag.FormaPagamento, pag.Valor, pag.Troco, pag.TxId);
+            await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+            throw;
         }
-
-        var totalPagoSemTroco = request.Pagamentos.Sum(p => p.Valor - p.Troco);
-        if (totalPagoSemTroco < venda.ValorLiquido)
-        {
-            throw new DomainException($"Total recebido (R$ {totalPagoSemTroco:F2}) é insuficiente para cobrir o valor líquido da venda (R$ {venda.ValorLiquido:F2}).");
-        }
-
-        await _vendaRepository.AdicionarAsync(venda, cancellationToken);
-
-        return VendaDto.FromEntity(venda);
     }
 }
 
@@ -111,33 +127,63 @@ public class CancelarVendaCommandHandler : IRequestHandler<CancelarVendaCommand,
 {
     private readonly IVendaRepository _vendaRepository;
     private readonly IProdutoRepository _produtoRepository;
+    private readonly IOperadorRepository _operadorRepository;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public CancelarVendaCommandHandler(IVendaRepository vendaRepository, IProdutoRepository produtoRepository)
+    public CancelarVendaCommandHandler(
+        IVendaRepository vendaRepository,
+        IProdutoRepository produtoRepository,
+        IOperadorRepository operadorRepository,
+        IUnitOfWork unitOfWork)
     {
         _vendaRepository = vendaRepository;
         _produtoRepository = produtoRepository;
+        _operadorRepository = operadorRepository;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<bool> Handle(CancelarVendaCommand request, CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(request.SupervisorPin))
+            throw new DomainException("O PIN de supervisor é obrigatório para autorizar o cancelamento da venda.");
+
+        // Validação com BCrypt contra os supervisores ativos no banco
+        var supervisores = await _operadorRepository.ObterSupervisoresAtivosAsync(cancellationToken);
+        var supervisorAutorizado = supervisores.FirstOrDefault(s => s.ValidarPin(request.SupervisorPin));
+
+        if (supervisorAutorizado == null)
+            throw new DomainException("PIN de supervisor inválido ou não autorizado. Apenas supervisores ativos podem cancelar vendas.");
+
         var venda = await _vendaRepository.ObterVendaCompletaPorIdAsync(request.VendaId, cancellationToken);
         if (venda == null)
             throw new DomainException($"Venda de ID '{request.VendaId}' não encontrada.");
 
-        venda.Cancelar(request.Motivo);
+        await _unitOfWork.BeginTransactionAsync(cancellationToken);
 
-        // Estorna o estoque de todos os itens da venda
-        foreach (var item in venda.Itens)
+        try
         {
-            var produto = await _produtoRepository.ObterPorIdAsync(item.ProdutoId, cancellationToken);
-            if (produto != null)
-            {
-                produto.EstornarEstoque(item.Quantidade);
-                await _produtoRepository.AtualizarAsync(produto, cancellationToken);
-            }
-        }
+            venda.Cancelar($"{request.Motivo} (Autorizado por Supervisor: {supervisorAutorizado.Nome})");
 
-        await _vendaRepository.AtualizarAsync(venda, cancellationToken);
-        return true;
+            // Estorna o estoque de todos os itens da venda
+            foreach (var item in venda.Itens)
+            {
+                var produto = await _produtoRepository.ObterPorIdAsync(item.ProdutoId, cancellationToken);
+                if (produto != null)
+                {
+                    produto.EstornarEstoque(item.Quantidade);
+                    await _produtoRepository.AtualizarAsync(produto, cancellationToken);
+                }
+            }
+
+            await _vendaRepository.AtualizarAsync(venda, cancellationToken);
+            await _unitOfWork.CommitTransactionAsync(cancellationToken);
+
+            return true;
+        }
+        catch
+        {
+            await _unitOfWork.RollbackTransactionAsync(cancellationToken);
+            throw;
+        }
     }
 }

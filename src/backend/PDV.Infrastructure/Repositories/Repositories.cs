@@ -29,19 +29,18 @@ public class Repository<T> : IRepository<T> where T : BaseEntity
     public virtual async Task AdicionarAsync(T entity, CancellationToken cancellationToken = default)
     {
         await _dbSet.AddAsync(entity, cancellationToken);
-        await _context.SaveChangesAsync(cancellationToken);
     }
 
-    public virtual async Task AtualizarAsync(T entity, CancellationToken cancellationToken = default)
+    public virtual Task AtualizarAsync(T entity, CancellationToken cancellationToken = default)
     {
         _dbSet.Update(entity);
-        await _context.SaveChangesAsync(cancellationToken);
+        return Task.CompletedTask;
     }
 
-    public virtual async Task RemoverAsync(T entity, CancellationToken cancellationToken = default)
+    public virtual Task RemoverAsync(T entity, CancellationToken cancellationToken = default)
     {
         _dbSet.Remove(entity);
-        await _context.SaveChangesAsync(cancellationToken);
+        return Task.CompletedTask;
     }
 }
 
@@ -57,11 +56,29 @@ public class ProdutoRepository : Repository<Produto>, IProdutoRepository
 
     public async Task<List<Produto>> BuscarPorNomeOuCodigoAsync(string termo, CancellationToken cancellationToken = default)
     {
-        var termoLimpo = termo.Trim().ToLower();
+        var termoLimpo = termo.Trim();
         return await _dbSet
-            .Where(p => p.Ativo && (p.CodigoBarras.ToLower().Contains(termoLimpo) || p.Nome.ToLower().Contains(termoLimpo)))
+            .Where(p => p.Ativo && (EF.Functions.Like(p.CodigoBarras, $"%{termoLimpo}%") || EF.Functions.Like(p.Nome, $"%{termoLimpo}%")))
             .OrderBy(p => p.Nome)
             .Take(30)
+            .ToListAsync(cancellationToken);
+    }
+}
+
+public class OperadorRepository : Repository<Operador>, IOperadorRepository
+{
+    public OperadorRepository(PdvDbContext context) : base(context) { }
+
+    public async Task<Operador?> ObterPorMatriculaAsync(string matricula, CancellationToken cancellationToken = default)
+    {
+        var matFormatada = matricula.Trim();
+        return await _dbSet.FirstOrDefaultAsync(o => o.Matricula == matFormatada && o.Ativo, cancellationToken);
+    }
+
+    public async Task<List<Operador>> ObterSupervisoresAtivosAsync(CancellationToken cancellationToken = default)
+    {
+        return await _dbSet
+            .Where(o => o.Ativo && o.Perfil == Domain.Enums.PerfilOperador.Supervisor)
             .ToListAsync(cancellationToken);
     }
 }

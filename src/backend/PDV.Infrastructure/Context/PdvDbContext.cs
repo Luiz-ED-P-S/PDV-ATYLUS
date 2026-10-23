@@ -64,6 +64,8 @@ public class PdvDbContext : DbContext
             entity.Property(v => v.OperadorId).IsRequired().HasMaxLength(100);
             entity.Property(v => v.ValorTotal).HasPrecision(18, 2);
             entity.Property(v => v.Desconto).HasPrecision(18, 2);
+            entity.Property(v => v.ClienteNome).HasMaxLength(150);
+            entity.Property(v => v.ClienteDocumento).HasMaxLength(20);
 
             entity.HasMany(v => v.Itens)
                 .WithOne()
