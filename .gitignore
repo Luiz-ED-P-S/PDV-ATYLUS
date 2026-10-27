@@ -52,10 +52,12 @@ pnpm-debug.log*
 # Tauri Desktop Build & Sidecars
 src-tauri/target/
 src-tauri/binaries/
+src-tauri/.cargo/
 dist-exe/*.exe
 dist-exe/*.pdb
 dist-exe/binaries/
 dist-exe/wwwroot/
+dist-exe/backups/
 *.msi
 *.exe
 

@@ -60,7 +60,7 @@ export const CashierModal: React.FC<CashierModalProps> = ({ isOpen, onClose }) =
               {isAberto ? <Unlock className="w-5 h-5" /> : <Lock className="w-5 h-5" />}
             </div>
             <div>
-              <h2 className="text-xl font-bold text-white">Central de Caixa (F2) — ATYLUS PDV</h2>
+              <h2 className="text-xl font-bold text-white">Central de Caixa (F3) — ATYLUS PDV</h2>
               <p className="text-xs text-slate-400">
                 Status: <strong className={isAberto ? 'text-emerald-400' : 'text-red-400'}>{isAberto ? 'ABERTO' : 'FECHADO'}</strong> • Operador: {operador.nome}
               </p>
