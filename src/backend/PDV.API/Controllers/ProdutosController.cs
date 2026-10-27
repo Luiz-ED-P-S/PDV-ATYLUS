@@ -40,4 +40,24 @@ public class ProdutosController : ControllerBase
         var produto = await _mediator.Send(command);
         return CreatedAtAction(nameof(ObterPorCodigo), new { codigoBarras = produto.CodigoBarras }, produto);
     }
+
+    [HttpPut("{id}")]
+    public async Task<ActionResult<ProdutoDto>> AtualizarProduto(Guid id, [FromBody] AtualizarProdutoRequest request)
+    {
+        var produto = await _mediator.Send(new AtualizarProdutoCommand(
+            id,
+            request.Nome,
+            request.PrecoVenda,
+            request.PrecoCusto,
+            request.EstoqueAtual,
+            request.EstoqueMinimo));
+        return Ok(produto);
+    }
 }
+
+public record AtualizarProdutoRequest(
+    string? Nome,
+    decimal? PrecoVenda,
+    decimal? PrecoCusto,
+    decimal? EstoqueAtual,
+    decimal? EstoqueMinimo);

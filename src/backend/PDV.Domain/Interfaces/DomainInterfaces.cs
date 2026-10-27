@@ -40,6 +40,7 @@ public interface ICaixaRepository : IRepository<Caixa>
 
 public interface IVendaRepository : IRepository<Venda>
 {
+    Task<List<Venda>> ObterTodasVendasAsync(CancellationToken cancellationToken = default);
     Task<List<Venda>> ObterVendasPorCaixaAsync(Guid caixaId, CancellationToken cancellationToken = default);
     Task<Venda?> ObterVendaCompletaPorIdAsync(Guid id, CancellationToken cancellationToken = default);
 }

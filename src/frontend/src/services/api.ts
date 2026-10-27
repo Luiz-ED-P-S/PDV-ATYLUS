@@ -57,6 +57,64 @@ export const pdvApi = {
     }
   },
 
+  async criarProduto(produtoData: {
+    codigoBarras: string;
+    nome: string;
+    precoVenda: number;
+    precoCusto: number;
+    estoqueAtual: number;
+    estoqueMinimo: number;
+  }): Promise<Produto> {
+    try {
+      const res = await api.post<Produto>('/produtos', produtoData);
+      return res.data;
+    } catch (err) {
+      const novoProduto: Produto = {
+        id: 'prod-' + Date.now(),
+        ...produtoData,
+        ativo: true,
+      };
+      MOCK_PRODUTOS.unshift(novoProduto);
+      return novoProduto;
+    }
+  },
+
+  async atualizarProduto(id: string, produtoData: {
+    nome?: string;
+    precoVenda?: number;
+    precoCusto?: number;
+    estoqueAtual?: number;
+    estoqueMinimo?: number;
+  }): Promise<Produto> {
+    try {
+      const res = await api.put<Produto>(`/produtos/${id}`, produtoData);
+      return res.data;
+    } catch {
+      const idx = MOCK_PRODUTOS.findIndex(p => p.id === id);
+      if (idx !== -1) {
+        MOCK_PRODUTOS[idx] = {
+          ...MOCK_PRODUTOS[idx],
+          ...produtoData,
+        };
+        return MOCK_PRODUTOS[idx];
+      }
+      throw new Error('Produto não encontrado');
+    }
+  },
+
+  async listarTodasVendas(): Promise<Venda[]> {
+    try {
+      const res = await api.get<Venda[]>('/vendas');
+      return res.data;
+    } catch {
+      return [];
+    }
+  },
+
+  async cancelarVenda(vendaId: string, motivo: string, supervisorPin: string): Promise<void> {
+    await api.post(`/vendas/${vendaId}/cancelar`, { motivo, supervisorPin });
+  },
+
   async obterCaixaAtual(): Promise<Caixa | null> {
     try {
       const res = await api.get<Caixa>('/caixa/atual');

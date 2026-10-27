@@ -69,6 +69,28 @@ public class Produto : BaseEntity
         RegistrarAtualizacao();
     }
 
+    public void AtualizarDados(string nome, decimal precoVenda, decimal precoCusto, decimal estoqueAtual, decimal estoqueMinimo)
+    {
+        if (string.IsNullOrWhiteSpace(nome))
+            throw new DomainException("O nome do produto é obrigatório.");
+
+        if (precoVenda <= 0)
+            throw new DomainException("O preço de venda deve ser maior que zero.");
+
+        Nome = nome.Trim();
+        PrecoVenda = precoVenda;
+        PrecoCusto = precoCusto;
+        EstoqueAtual = estoqueAtual;
+        EstoqueMinimo = estoqueMinimo;
+        RegistrarAtualizacao();
+    }
+
+    public void AjustarEstoque(decimal novoEstoque)
+    {
+        EstoqueAtual = novoEstoque;
+        RegistrarAtualizacao();
+    }
+
     public void Desativar()
     {
         Ativo = false;

@@ -115,6 +115,15 @@ public class VendaRepository : Repository<Venda>, IVendaRepository
 {
     public VendaRepository(PdvDbContext context) : base(context) { }
 
+    public async Task<List<Venda>> ObterTodasVendasAsync(CancellationToken cancellationToken = default)
+    {
+        return await _dbSet
+            .Include(v => v.Itens)
+            .Include(v => v.Pagamentos)
+            .OrderByDescending(v => v.DataVenda)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<List<Venda>> ObterVendasPorCaixaAsync(Guid caixaId, CancellationToken cancellationToken = default)
     {
         return await _dbSet

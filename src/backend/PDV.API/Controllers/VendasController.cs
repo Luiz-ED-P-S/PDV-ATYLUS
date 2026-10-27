@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using PDV.Application.Commands.Vendas;
 using PDV.Application.DTOs;
+using PDV.Application.Queries.Vendas;
 
 namespace PDV.API.Controllers;
 
@@ -14,6 +15,13 @@ public class VendasController : ControllerBase
     public VendasController(IMediator mediator)
     {
         _mediator = mediator;
+    }
+
+    [HttpGet]
+    public async Task<ActionResult<List<VendaDto>>> ObterTodasVendas()
+    {
+        var vendas = await _mediator.Send(new ObterTodasVendasQuery());
+        return Ok(vendas);
     }
 
     [HttpPost]

@@ -95,9 +95,23 @@ public record CaixaDto(
             c.Movimentacoes.Select(m => new MovimentacaoCaixaDto(m.Id, m.Tipo, m.Valor, m.Motivo, m.OperadorId, m.DataHora)).ToList());
 }
 
+public record ResumoFormaPagamentoDto(
+    FormaPagamento FormaPagamento,
+    decimal ValorTotal,
+    int Quantidade);
+
 public record FechamentoCegoResultadoDto(
     Guid CaixaId,
     decimal SaldoEsperadoSistema,
     decimal SaldoInformadoOperador,
     decimal Diferenca,
-    string StatusConferencia);
+    string StatusConferencia,
+    decimal SaldoInicial = 0,
+    decimal TotalSuprimentos = 0,
+    decimal TotalSangrias = 0,
+    decimal TotalVendasDinheiro = 0,
+    decimal TotalVendasGeral = 0,
+    List<ResumoFormaPagamentoDto>? VendasPorFormaPagamento = null,
+    DateTime? DataAbertura = null,
+    DateTime? DataFechamento = null,
+    string? OperadorId = null);

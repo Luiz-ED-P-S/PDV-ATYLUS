@@ -108,11 +108,22 @@ public class FecharCaixaCegoCommandHandler : IRequestHandler<FecharCaixaCegoComm
 
         // Calcula total esperado no sistema pelo somatório de entradas e saídas
         var vendas = await _vendaRepository.ObterVendasPorCaixaAsync(caixa.Id, cancellationToken);
-        var vendasDinheiro = vendas
-            .Where(v => v.Status == StatusVenda.Concluida)
+        var vendasConcluidas = vendas.Where(v => v.Status == StatusVenda.Concluida).ToList();
+        var vendasDinheiro = vendasConcluidas
             .SelectMany(v => v.Pagamentos)
             .Where(p => p.FormaPagamento == FormaPagamento.Dinheiro)
             .Sum(p => p.Valor - p.Troco);
+
+        var totalVendasGeral = vendasConcluidas.Sum(v => v.ValorLiquido);
+
+        var resumoPagamentos = vendasConcluidas
+            .SelectMany(v => v.Pagamentos)
+            .GroupBy(p => p.FormaPagamento)
+            .Select(g => new ResumoFormaPagamentoDto(
+                g.Key,
+                g.Sum(p => p.FormaPagamento == FormaPagamento.Dinheiro ? p.Valor - p.Troco : p.Valor),
+                g.Count()))
+            .ToList();
 
         var suprimentos = caixa.Movimentacoes.Where(m => m.Tipo == TipoMovimentacaoCaixa.Suprimento).Sum(m => m.Valor);
         var sangrias = caixa.Movimentacoes.Where(m => m.Tipo == TipoMovimentacaoCaixa.Sangria).Sum(m => m.Valor);
@@ -146,6 +157,15 @@ public class FecharCaixaCegoCommandHandler : IRequestHandler<FecharCaixaCegoComm
             saldoEsperado,
             request.SaldoInformado,
             diferenca,
-            status);
+            status,
+            caixa.SaldoInicial,
+            suprimentos,
+            sangrias,
+            vendasDinheiro,
+            totalVendasGeral,
+            resumoPagamentos,
+            caixa.DataAbertura,
+            caixa.DataFechamento,
+            caixa.OperadorId);
     }
 }

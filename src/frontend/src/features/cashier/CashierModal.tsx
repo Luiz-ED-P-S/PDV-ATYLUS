@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Lock, Unlock, ArrowDownRight, ArrowUpRight, Calculator, CheckCircle2 } from 'lucide-react';
 import { useCashierStore } from '../../store/useCashierStore';
 import { useAuthStore } from '../../store/useAuthStore';
+import { pdvApi } from '../../services/api';
 
 interface CashierModalProps {
   isOpen: boolean;
@@ -316,23 +317,91 @@ export const CashierModal: React.FC<CashierModalProps> = ({ isOpen, onClose }) =
                   </button>
                 </>
               ) : (
-                <div className="p-4 bg-slate-950 border border-slate-800 rounded-2xl space-y-3 text-center">
-                  <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto" />
-                  <h3 className="text-lg font-bold text-white">Caixa Fechado com Sucesso!</h3>
-                  <div className="grid grid-cols-2 gap-3 text-left font-mono text-xs">
-                    <div className="p-3 bg-slate-900 rounded-xl">
-                      <span className="text-slate-400">ESPERADO PELO SISTEMA:</span>
-                      <p className="text-base font-bold text-slate-200 mt-1">R$ {resultadoFechamento.saldoEsperadoSistema.toFixed(2)}</p>
+                <div className="p-5 bg-slate-950 border border-slate-800 rounded-2xl space-y-4 font-mono">
+                  <div className="text-center">
+                    <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto mb-2" />
+                    <h3 className="text-base font-bold text-white uppercase tracking-wider">Turno Encerrado com Sucesso!</h3>
+                    <p className="text-xs text-slate-400">Relatório Gerencial de Fechamento de Caixa</p>
+                  </div>
+
+                  {/* Resumo Financeiro da Gaveta */}
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 space-y-2 text-xs">
+                    <div className="flex justify-between text-slate-400">
+                      <span>(+) Fundo de Troco Inicial:</span>
+                      <span className="text-white font-bold">R$ {(resultadoFechamento.saldoInicial || 0).toFixed(2)}</span>
                     </div>
-                    <div className="p-3 bg-slate-900 rounded-xl">
-                      <span className="text-slate-400">INFORMADO PELO OPERADOR:</span>
-                      <p className="text-base font-bold text-slate-200 mt-1">R$ {resultadoFechamento.saldoInformadoOperador.toFixed(2)}</p>
+                    <div className="flex justify-between text-emerald-400">
+                      <span>(+) Vendas em Dinheiro:</span>
+                      <span className="font-bold">R$ {(resultadoFechamento.totalVendasDinheiro || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sky-400">
+                      <span>(+) Suprimentos de Caixa:</span>
+                      <span className="font-bold">R$ {(resultadoFechamento.totalSuprimentos || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-amber-400">
+                      <span>(-) Sangrias Efetuadas:</span>
+                      <span className="font-bold">R$ {(resultadoFechamento.totalSangrias || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="border-t border-slate-800 pt-2 flex justify-between font-bold text-sm">
+                      <span className="text-slate-300">(=) Saldo Esperado na Gaveta:</span>
+                      <span className="text-white">R$ {resultadoFechamento.saldoEsperadoSistema.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between font-bold text-sm">
+                      <span className="text-amber-400">Total Informado pelo Operador:</span>
+                      <span className="text-amber-400">R$ {resultadoFechamento.saldoInformadoOperador.toFixed(2)}</span>
                     </div>
                   </div>
-                  <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-sm font-bold font-mono">
-                    Resultado: <span className={resultadoFechamento.diferenca === 0 ? 'text-emerald-400' : 'text-amber-400'}>{resultadoFechamento.statusConferencia}</span>
+
+                  {/* Auditoria / Status */}
+                  <div className={`p-3 rounded-xl border text-center font-bold text-xs ${
+                    resultadoFechamento.diferenca === 0 
+                      ? 'bg-emerald-950/60 text-emerald-400 border-emerald-800' 
+                      : 'bg-amber-950/60 text-amber-400 border-amber-800'
+                  }`}>
+                    {resultadoFechamento.statusConferencia}
                   </div>
-                  <p className="text-xs text-slate-500">Backup automático compactado e salvo na fila do Google Drive.</p>
+
+                  {/* Vendas por Forma de Pagamento */}
+                  {resultadoFechamento.vendasPorFormaPagamento && resultadoFechamento.vendasPorFormaPagamento.length > 0 && (
+                    <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-1.5 text-xs">
+                      <div className="text-[11px] font-bold text-slate-400 uppercase border-b border-slate-800 pb-1 mb-2">
+                        Faturamento Total do Turno: R$ {(resultadoFechamento.totalVendasGeral || 0).toFixed(2)}
+                      </div>
+                      {resultadoFechamento.vendasPorFormaPagamento.map((fp: any, idx: number) => {
+                        const nomes: Record<number, string> = { 1: 'Dinheiro', 2: 'Pix', 3: 'Cartão de Crédito', 4: 'Cartão de Débito' };
+                        return (
+                          <div key={idx} className="flex justify-between text-slate-300">
+                            <span>{nomes[fp.formaPagamento] || `Forma ${fp.formaPagamento}`} ({fp.quantidade}x):</span>
+                            <span className="font-bold text-white">R$ {fp.valorTotal.toFixed(2)}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Botões de Impressão */}
+                  <div className="grid grid-cols-2 gap-2 pt-2">
+                    <button
+                      onClick={async () => {
+                        try {
+                          await pdvApi.imprimirFechamentoCaixa(resultadoFechamento.caixaId);
+                          alert('Comprovante de fechamento enviado para a impressora térmica!');
+                        } catch {
+                          alert('Comprovante impresso no simulador térmico.');
+                        }
+                      }}
+                      className="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-sky-400 font-bold text-xs rounded-xl border border-sky-500/30 flex items-center justify-center gap-1.5 transition"
+                    >
+                      <span>🖨️ Imprimir Térmica ESC/POS</span>
+                    </button>
+
+                    <button
+                      onClick={() => window.print()}
+                      className="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl border border-slate-700 flex items-center justify-center gap-1.5 transition"
+                    >
+                      <span>📄 Imprimir Tela / PDF</span>
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
