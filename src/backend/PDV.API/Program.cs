@@ -21,8 +21,9 @@ builder.Services.AddSwaggerGen(c =>
     c.SwaggerDoc("v1", new() { Title = "PDV Atylus API", Version = "v1", Description = "API do Ponto de Venda Offline-First com Clean Architecture e CQRS" });
 });
 
-// Worker de Backup em segundo plano no Google Drive
+// Worker de Backup em segundo plano no Google Drive e Worker de Sincronização em Nuvem (Offline-First)
 builder.Services.AddHostedService<GoogleDriveBackupWorker>();
+builder.Services.AddHostedService<CloudSyncWorker>();
 
 // Habilitar CORS para o frontend (Vite React na porta 5173 ou produção)
 builder.Services.AddCors(options =>

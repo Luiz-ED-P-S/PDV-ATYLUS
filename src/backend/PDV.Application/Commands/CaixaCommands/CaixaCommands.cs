@@ -21,11 +21,16 @@ public class AbrirCaixaCommandValidator : AbstractValidator<AbrirCaixaCommand>
 public class AbrirCaixaCommandHandler : IRequestHandler<AbrirCaixaCommand, CaixaDto>
 {
     private readonly ICaixaRepository _caixaRepository;
+    private readonly ICloudSyncService _cloudSyncService;
     private readonly IUnitOfWork _unitOfWork;
 
-    public AbrirCaixaCommandHandler(ICaixaRepository caixaRepository, IUnitOfWork unitOfWork)
+    public AbrirCaixaCommandHandler(
+        ICaixaRepository caixaRepository,
+        ICloudSyncService cloudSyncService,
+        IUnitOfWork unitOfWork)
     {
         _caixaRepository = caixaRepository;
+        _cloudSyncService = cloudSyncService;
         _unitOfWork = unitOfWork;
     }
 
@@ -39,7 +44,17 @@ public class AbrirCaixaCommandHandler : IRequestHandler<AbrirCaixaCommand, Caixa
         await _caixaRepository.AdicionarAsync(novoCaixa, cancellationToken);
         await _unitOfWork.CommitAsync(cancellationToken);
 
-        return CaixaDto.FromEntity(novoCaixa);
+        var dto = CaixaDto.FromEntity(novoCaixa);
+        try
+        {
+            await _cloudSyncService.EnfileirarAsync("Caixa", novoCaixa.Id, "Abrir", dto, null, cancellationToken);
+        }
+        catch
+        {
+            // Standby local garantido
+        }
+
+        return dto;
     }
 }
 
@@ -53,11 +68,16 @@ public record RegistrarMovimentacaoCommand(
 public class RegistrarMovimentacaoCommandHandler : IRequestHandler<RegistrarMovimentacaoCommand, MovimentacaoCaixaDto>
 {
     private readonly ICaixaRepository _caixaRepository;
+    private readonly ICloudSyncService _cloudSyncService;
     private readonly IUnitOfWork _unitOfWork;
 
-    public RegistrarMovimentacaoCommandHandler(ICaixaRepository caixaRepository, IUnitOfWork unitOfWork)
+    public RegistrarMovimentacaoCommandHandler(
+        ICaixaRepository caixaRepository,
+        ICloudSyncService cloudSyncService,
+        IUnitOfWork unitOfWork)
     {
         _caixaRepository = caixaRepository;
+        _cloudSyncService = cloudSyncService;
         _unitOfWork = unitOfWork;
     }
 
@@ -72,7 +92,18 @@ public class RegistrarMovimentacaoCommandHandler : IRequestHandler<RegistrarMovi
         await _unitOfWork.CommitAsync(cancellationToken);
 
         var mov = caixa.Movimentacoes.Last();
-        return new MovimentacaoCaixaDto(mov.Id, mov.Tipo, mov.Valor, mov.Motivo, mov.OperadorId, mov.DataHora);
+        var dto = new MovimentacaoCaixaDto(mov.Id, mov.Tipo, mov.Valor, mov.Motivo, mov.OperadorId, mov.DataHora);
+
+        try
+        {
+            await _cloudSyncService.EnfileirarAsync("MovimentacaoCaixa", mov.Id, "Criar", dto, null, cancellationToken);
+        }
+        catch
+        {
+            // Standby local garantido
+        }
+
+        return dto;
     }
 }
 
@@ -86,17 +117,20 @@ public class FecharCaixaCegoCommandHandler : IRequestHandler<FecharCaixaCegoComm
     private readonly ICaixaRepository _caixaRepository;
     private readonly IVendaRepository _vendaRepository;
     private readonly IGoogleDriveBackupService _googleDriveBackupService;
+    private readonly ICloudSyncService _cloudSyncService;
     private readonly IUnitOfWork _unitOfWork;
 
     public FecharCaixaCegoCommandHandler(
         ICaixaRepository caixaRepository,
         IVendaRepository vendaRepository,
         IGoogleDriveBackupService googleDriveBackupService,
+        ICloudSyncService cloudSyncService,
         IUnitOfWork unitOfWork)
     {
         _caixaRepository = caixaRepository;
         _vendaRepository = vendaRepository;
         _googleDriveBackupService = googleDriveBackupService;
+        _cloudSyncService = cloudSyncService;
         _unitOfWork = unitOfWork;
     }
 
@@ -134,6 +168,21 @@ public class FecharCaixaCegoCommandHandler : IRequestHandler<FecharCaixaCegoComm
         caixa.FecharCego(request.SaldoInformado, request.Observacoes);
         await _caixaRepository.AtualizarAsync(caixa, cancellationToken);
         await _unitOfWork.CommitAsync(cancellationToken);
+
+        try
+        {
+            await _cloudSyncService.EnfileirarAsync(
+                "Caixa",
+                caixa.Id,
+                "Fechar",
+                new { CaixaId = caixa.Id, SaldoInformado = request.SaldoInformado, Observacoes = request.Observacoes, DataFechamento = caixa.DataFechamento },
+                null,
+                cancellationToken);
+        }
+        catch
+        {
+            // Standby local garantido
+        }
 
         // Dispara backup automático no Google Drive ao fechar o caixa
         try

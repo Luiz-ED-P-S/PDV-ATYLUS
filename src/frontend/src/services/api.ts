@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Caixa, MovimentacaoCaixa, PixGenerateResult, Produto, Venda } from '../types';
+import { Caixa, MovimentacaoCaixa, PixGenerateResult, Produto, ResultadoSincronizacao, StatusSincronizacao, Venda } from '../types';
 
 const api = axios.create({
   baseURL: '/api/v1',
@@ -90,11 +90,32 @@ export const pdvApi = {
     desconto: number;
     clienteNome?: string;
     clienteDocumento?: string;
+    terminalId?: string;
     itens: { produtoId: string; quantidade: number; precoUnitario: number }[];
     pagamentos: { formaPagamento: number; valor: number; troco: number; txId?: string }[];
   }): Promise<Venda> {
     const res = await api.post<Venda>('/vendas', vendaData);
     return res.data;
+  },
+
+  // Sincronização em Nuvem & Multi-Terminal (Offline-First)
+  async obterStatusSync(): Promise<StatusSincronizacao> {
+    const res = await api.get<StatusSincronizacao>('/sync/status');
+    return res.data;
+  },
+
+  async forcarSincronizacao(): Promise<ResultadoSincronizacao> {
+    const res = await api.post<ResultadoSincronizacao>('/sync/forcar');
+    return res.data;
+  },
+
+  async testarConexaoNuvem(): Promise<{ online: boolean }> {
+    const res = await api.post<{ online: boolean }>('/sync/testar-conexao');
+    return res.data;
+  },
+
+  async atualizarConfigSync(config: { cloudUrl?: string; terminalId?: string; apiKey?: string }): Promise<void> {
+    await api.post('/sync/config', config);
   },
 
   async gerarPix(valor: number, descricao: string): Promise<PixGenerateResult> {

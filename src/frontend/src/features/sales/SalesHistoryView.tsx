@@ -146,8 +146,8 @@ export const SalesHistoryView: React.FC = () => {
               ) : (
                 vendasFiltradas.map(v => (
                   <tr key={v.id} className="hover:bg-[#14212e] text-slate-300">
-                    <td className="p-3 font-bold text-sky-400 truncate max-w-[120px]" title={v.id}>
-                      {v.id.substring(0, 8)}...
+                    <td className="p-3 font-bold text-sky-400 truncate max-w-[130px]" title={`ID: ${v.id} | Terminal: ${v.terminalId || 'CX01'}`}>
+                      {v.codigoIdentificador || `${v.id.substring(0, 8)}...`}
                     </td>
                     <td className="p-3 text-slate-400">
                       {new Date(v.dataVenda).toLocaleDateString('pt-BR')} {new Date(v.dataVenda).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}

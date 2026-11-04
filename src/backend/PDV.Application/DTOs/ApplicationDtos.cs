@@ -44,7 +44,10 @@ public record VendaDto(
     StatusVenda Status,
     string? MotivoCancelamento,
     List<ItemVendaDto> Itens,
-    List<PagamentoVendaDto> Pagamentos)
+    List<PagamentoVendaDto> Pagamentos,
+    string TerminalId = "CX01",
+    int NumeroSequencial = 1,
+    string? CodigoIdentificador = null)
 {
     public static VendaDto FromEntity(Venda v) =>
         new(
@@ -60,7 +63,10 @@ public record VendaDto(
             v.Status,
             v.MotivoCancelamento,
             v.Itens.Select(i => new ItemVendaDto(i.ProdutoId, i.ProdutoNome, i.CodigoBarras, i.Quantidade, i.PrecoUnitario, i.Subtotal)).ToList(),
-            v.Pagamentos.Select(p => new PagamentoVendaDto(p.FormaPagamento, p.Valor, p.Troco, p.TxId)).ToList());
+            v.Pagamentos.Select(p => new PagamentoVendaDto(p.FormaPagamento, p.Valor, p.Troco, p.TxId)).ToList(),
+            v.TerminalId,
+            v.NumeroSequencial,
+            v.CodigoIdentificador);
 }
 
 public record MovimentacaoCaixaDto(

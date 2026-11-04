@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Cloud, Volume2, HardDrive, Keyboard, CheckCircle2, Printer, Scissors, Inbox, Play, RefreshCw, AlertCircle } from 'lucide-react';
+import { Settings, Cloud, Volume2, HardDrive, Keyboard, CheckCircle2, Printer, Scissors, Inbox, Play, RefreshCw, AlertCircle, Server, Save } from 'lucide-react';
 import { sound } from '../../services/sound';
 import { pdvApi } from '../../services/api';
+import { StatusSincronizacao } from '../../types';
 
 export interface PrinterConfig {
   nomeOuEndereco: string;
@@ -43,9 +44,67 @@ export const SettingsView: React.FC = () => {
   const [printerFeedback, setPrinterFeedback] = useState<{ tipo: 'ok' | 'err'; msg: string } | null>(null);
   const [testandoPrinter, setTestandoPrinter] = useState(false);
 
+  // Estados de Sincronização em Nuvem (Multi-Terminal)
+  const [syncStatus, setSyncStatus] = useState<StatusSincronizacao | null>(null);
+  const [terminalId, setTerminalId] = useState('CX01');
+  const [cloudUrl, setCloudUrl] = useState('');
+  const [apiKey, setApiKey] = useState('');
+  const [salvandoSync, setSalvandoSync] = useState(false);
+  const [syncFeedback, setSyncFeedback] = useState<{ tipo: 'ok' | 'err'; msg: string } | null>(null);
+  const [sincronizandoAgora, setSincronizandoAgora] = useState(false);
+
   useEffect(() => {
     carregarImpressoras();
+    carregarSyncStatus();
   }, []);
+
+  const carregarSyncStatus = async () => {
+    try {
+      const status = await pdvApi.obterStatusSync();
+      setSyncStatus(status);
+      if (status.terminalId) setTerminalId(status.terminalId);
+      if (status.cloudUrl) setCloudUrl(status.cloudUrl);
+    } catch {
+      // API backend offline
+    }
+  };
+
+  const salvarConfigSync = async () => {
+    setSalvandoSync(true);
+    setSyncFeedback(null);
+    try {
+      await pdvApi.atualizarConfigSync({ terminalId, cloudUrl, apiKey });
+      sound.playSuccessChime();
+      setSyncFeedback({ tipo: 'ok', msg: 'Configuração de terminal e nuvem salva com sucesso!' });
+      await carregarSyncStatus();
+    } catch (err: any) {
+      sound.playErrorBeep();
+      setSyncFeedback({ tipo: 'err', msg: `Falha ao salvar: ${err.message}` });
+    } finally {
+      setSalvandoSync(false);
+    }
+  };
+
+  const dispararSyncAgora = async () => {
+    setSincronizandoAgora(true);
+    setSyncFeedback(null);
+    try {
+      const res = await pdvApi.forcarSincronizacao();
+      if (res.sucesso) {
+        sound.playSuccessChime();
+        setSyncFeedback({ tipo: 'ok', msg: res.mensagem });
+      } else {
+        sound.playErrorBeep();
+        setSyncFeedback({ tipo: 'err', msg: res.mensagem });
+      }
+      await carregarSyncStatus();
+    } catch (err: any) {
+      sound.playErrorBeep();
+      setSyncFeedback({ tipo: 'err', msg: `Falha na sincronização: ${err.message}` });
+    } finally {
+      setSincronizandoAgora(false);
+    }
+  };
 
   const carregarImpressoras = async () => {
     setCarregandoImpressoras(true);
@@ -271,6 +330,128 @@ export const SettingsView: React.FC = () => {
               <Inbox className="w-3.5 h-3.5 text-emerald-400" />
               <span>Testar Abertura de Gaveta (RJ11)</span>
             </button>
+          </div>
+        </div>
+
+        {/* Card 0.5: Sincronização em Nuvem & Terminal Multi-PDV (Offline-First) */}
+        <div className="p-5 bg-[#111c26] border border-[#1f3042] rounded-2xl space-y-4 font-mono text-xs">
+          <div className="flex items-center justify-between border-b border-[#1f3042] pb-3">
+            <div className="flex items-center gap-2.5">
+              <Server className="w-5 h-5 text-emerald-400" />
+              <div>
+                <h3 className="font-bold text-white text-sm">Sincronização em Nuvem & Multi-Terminais (Offline-First)</h3>
+                <p className="text-[11px] text-slate-400 font-sans">
+                  Opera 100% offline localmente. Ao detectar internet, replica vendas e produtos para a nuvem sem conflito de IDs.
+                </p>
+              </div>
+            </div>
+            {syncStatus && (
+              <span
+                className={`px-2.5 py-0.5 rounded-full border text-[10px] font-bold ${
+                  syncStatus.online
+                    ? syncStatus.pendentes === 0
+                      ? 'bg-emerald-950/60 border-emerald-900 text-emerald-300'
+                      : 'bg-amber-950/60 border-amber-900 text-amber-300'
+                    : 'bg-rose-950/60 border-rose-900 text-rose-300'
+                }`}
+              >
+                {syncStatus.online
+                  ? syncStatus.pendentes === 0
+                    ? '● Nuvem Conectada'
+                    : `● Standby (${syncStatus.pendentes} pendentes)`
+                  : '○ Nuvem Offline (Standby Ativo)'}
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-slate-400 text-[11px]">Identificador do Terminal (Caixa):</label>
+              <input
+                type="text"
+                value={terminalId}
+                onChange={e => setTerminalId(e.target.value.toUpperCase())}
+                placeholder="Ex: CX01, CX02, TERMINAL-A"
+                className="w-full px-3 py-2 bg-[#090f16] border border-[#1f3042] rounded-xl text-white font-mono text-xs focus:outline-none focus:border-emerald-500"
+              />
+              <span className="text-[10px] text-slate-500 block">Prefixo único evita colisão de cupons e IDs</span>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-slate-400 text-[11px]">URL do Servidor / Hub em Nuvem:</label>
+              <input
+                type="text"
+                value={cloudUrl}
+                onChange={e => setCloudUrl(e.target.value)}
+                placeholder="https://nuvem.atylus.com.br"
+                className="w-full px-3 py-2 bg-[#090f16] border border-[#1f3042] rounded-xl text-white font-mono text-xs focus:outline-none focus:border-emerald-500"
+              />
+              <span className="text-[10px] text-slate-500 block">Deixe em branco para operar estritamente local</span>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-slate-400 text-[11px]">Chave de API / Token do Servidor:</label>
+              <input
+                type="password"
+                value={apiKey}
+                onChange={e => setApiKey(e.target.value)}
+                placeholder="Token seguro do hub"
+                className="w-full px-3 py-2 bg-[#090f16] border border-[#1f3042] rounded-xl text-white font-mono text-xs focus:outline-none focus:border-emerald-500"
+              />
+              <span className="text-[10px] text-slate-500 block">Autenticação com o serviço em nuvem</span>
+            </div>
+          </div>
+
+          {syncFeedback && (
+            <div
+              className={`p-3 rounded-xl border flex items-center gap-2 ${
+                syncFeedback.tipo === 'ok'
+                  ? 'bg-emerald-950/60 border-emerald-800 text-emerald-300'
+                  : 'bg-rose-950/60 border-rose-800 text-rose-300'
+              }`}
+            >
+              {syncFeedback.tipo === 'ok' ? (
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+              ) : (
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+              )}
+              <span>{syncFeedback.msg}</span>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between pt-2">
+            <div className="text-[11px] text-slate-400">
+              {syncStatus && (
+                <span>
+                  Fila Local Outbox: <strong className="text-white">{syncStatus.pendentes} registros</strong> • Última sync:{' '}
+                  <strong className="text-white">
+                    {syncStatus.ultimaSincronizacao
+                      ? new Date(syncStatus.ultimaSincronizacao).toLocaleString('pt-BR')
+                      : 'Ainda não realizada'}
+                  </strong>
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={salvarConfigSync}
+                disabled={salvandoSync}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold rounded-xl flex items-center gap-2 transition"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>{salvandoSync ? 'Salvando...' : 'Salvar Configuração'}</span>
+              </button>
+
+              <button
+                onClick={dispararSyncAgora}
+                disabled={sincronizandoAgora}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 font-bold rounded-xl flex items-center gap-2 transition"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${sincronizandoAgora ? 'animate-spin text-sky-400' : ''}`} />
+                <span>{sincronizandoAgora ? 'Sincronizando...' : 'Sincronizar Fila Agora'}</span>
+              </button>
+            </div>
           </div>
         </div>
 

@@ -1,9 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { Minus, Square, X, WifiOff, Clock } from 'lucide-react';
+import { Minus, Square, X, Clock, Cloud, CloudOff, RefreshCw } from 'lucide-react';
+import { pdvApi } from '../services/api';
+import { StatusSincronizacao } from '../types';
 
 export const DesktopTitlebar: React.FC = () => {
   const [hora, setHora] = useState(new Date().toLocaleTimeString('pt-BR'));
   const [isMaximized, setIsMaximized] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<StatusSincronizacao | null>(null);
+  const [sincronizandoManual, setSincronizandoManual] = useState(false);
+
+  const carregarStatusSync = async () => {
+    try {
+      const status = await pdvApi.obterStatusSync();
+      setSyncStatus(status);
+    } catch {
+      // API backend offline momentaneamente
+    }
+  };
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -12,18 +25,35 @@ export const DesktopTitlebar: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    carregarStatusSync();
+    const interval = setInterval(carregarStatusSync, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleForcarSync = async () => {
+    if (sincronizandoManual) return;
+    try {
+      setSincronizandoManual(true);
+      await pdvApi.forcarSincronizacao();
+      await carregarStatusSync();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSincronizandoManual(false);
+    }
+  };
+
   const handleMinimize = () => {
-    // Integração futura com Tauri window.minimize()
     console.log('Minimizar janela');
   };
 
   const handleMaximize = () => {
     setIsMaximized(!isMaximized);
-    // Integração futura com Tauri window.toggleMaximize()
   };
 
   const handleClose = () => {
-    if (confirm('Deseja realmente fechar o sistema PDV? O caixa permanecerá salvo localmente.')) {
+    if (confirm('Deseja realmente fechar o sistema PDV? O caixa e a fila de sincronização permanecerão salvos localmente.')) {
       window.close();
     }
   };
@@ -37,14 +67,51 @@ export const DesktopTitlebar: React.FC = () => {
         <span className="text-[10px] text-emerald-400 bg-emerald-950/60 px-1.5 py-0.2 rounded border border-emerald-900/50">
           Desktop Pro
         </span>
+        {syncStatus && (
+          <span className="text-[10px] text-sky-400 bg-sky-950/60 px-1.5 py-0.2 rounded border border-sky-900/50">
+            Terminal: {syncStatus.terminalId}
+          </span>
+        )}
       </div>
 
-      {/* Centro: Status de Operação Offline e Relógio */}
-      <div className="flex items-center gap-4 text-[11px]">
-        <div className="flex items-center gap-1.5 text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-900/60">
-          <WifiOff className="w-3 h-3 text-emerald-400" />
-          <span>Operação 100% Offline-First</span>
-        </div>
+      {/* Centro: Status de Operação Offline-First e Sincronização em Nuvem */}
+      <div className="flex items-center gap-3 text-[11px]">
+        {syncStatus && (
+          <button
+            onClick={handleForcarSync}
+            disabled={sincronizandoManual}
+            title={
+              syncStatus.online
+                ? `Nuvem Conectada: ${syncStatus.pendentes} pendente(s). Clique para sincronizar agora.`
+                : 'Modo Offline: Registros mantidos em fila local Standby. Clique para tentar reconectar.'
+            }
+            className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border transition cursor-pointer ${
+              syncStatus.online
+                ? syncStatus.pendentes === 0
+                  ? 'bg-emerald-950/50 border-emerald-900/60 text-emerald-300 hover:bg-emerald-900/40'
+                  : 'bg-amber-950/50 border-amber-900/60 text-amber-300 hover:bg-amber-900/40'
+                : 'bg-rose-950/50 border-rose-900/60 text-rose-300 hover:bg-rose-900/40'
+            }`}
+          >
+            {sincronizandoManual ? (
+              <RefreshCw className="w-3 h-3 animate-spin text-sky-400" />
+            ) : syncStatus.online ? (
+              <Cloud className="w-3 h-3 text-emerald-400" />
+            ) : (
+              <CloudOff className="w-3 h-3 text-rose-400" />
+            )}
+
+            <span>
+              {sincronizandoManual
+                ? 'Sincronizando...'
+                : syncStatus.online
+                ? syncStatus.pendentes === 0
+                  ? 'Nuvem Conectada'
+                  : `Standby Nuvem (${syncStatus.pendentes} pendentes)`
+                : `Offline (Standby Ativo: ${syncStatus.pendentes})`}
+            </span>
+          </button>
+        )}
 
         <div className="flex items-center gap-1.5 text-slate-400">
           <Clock className="w-3 h-3 text-sky-400" />

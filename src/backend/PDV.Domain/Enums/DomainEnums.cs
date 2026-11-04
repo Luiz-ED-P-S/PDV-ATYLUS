@@ -45,3 +45,10 @@ public enum LarguraBobina
     Mm80 = 80, // Padrão 48 colunas
     Mm58 = 58  // Padrão 32 colunas
 }
+
+public enum StatusSincronizacao
+{
+    Pendente = 1,
+    Sincronizado = 2,
+    Falha = 3
+}

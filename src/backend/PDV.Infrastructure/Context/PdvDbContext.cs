@@ -16,6 +16,7 @@ public class PdvDbContext : DbContext
     public DbSet<ItemVenda> ItensVenda => Set<ItemVenda>();
     public DbSet<PagamentoVenda> PagamentosVenda => Set<PagamentoVenda>();
     public DbSet<Operador> Operadores => Set<Operador>();
+    public DbSet<RegistroSincronizacao> FilaSincronizacao => Set<RegistroSincronizacao>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -62,6 +63,9 @@ public class PdvDbContext : DbContext
         {
             entity.HasKey(v => v.Id);
             entity.Property(v => v.OperadorId).IsRequired().HasMaxLength(100);
+            entity.Property(v => v.TerminalId).IsRequired().HasMaxLength(50).HasDefaultValue("CX01");
+            entity.Property(v => v.NumeroSequencial).HasDefaultValue(1);
+            entity.HasIndex(v => new { v.TerminalId, v.NumeroSequencial });
             entity.Property(v => v.ValorTotal).HasPrecision(18, 2);
             entity.Property(v => v.Desconto).HasPrecision(18, 2);
             entity.Property(v => v.ClienteNome).HasMaxLength(150);
@@ -76,6 +80,18 @@ public class PdvDbContext : DbContext
                 .WithOne()
                 .HasForeignKey(p => p.VendaId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Configuração de RegistroSincronizacao
+        modelBuilder.Entity<RegistroSincronizacao>(entity =>
+        {
+            entity.HasKey(s => s.Id);
+            entity.Property(s => s.TerminalId).IsRequired().HasMaxLength(50);
+            entity.Property(s => s.TipoEntidade).IsRequired().HasMaxLength(100);
+            entity.Property(s => s.Operacao).IsRequired().HasMaxLength(50);
+            entity.Property(s => s.PayloadJson).IsRequired();
+            entity.HasIndex(s => s.Status);
+            entity.HasIndex(s => s.CriadoEm);
         });
 
         // Configuração de ItemVenda

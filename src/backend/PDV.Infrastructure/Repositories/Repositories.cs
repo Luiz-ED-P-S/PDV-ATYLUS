@@ -141,4 +141,45 @@ public class VendaRepository : Repository<Venda>, IVendaRepository
             .Include(v => v.Pagamentos)
             .FirstOrDefaultAsync(v => v.Id == id, cancellationToken);
     }
+
+    public async Task<int> ObterProximoSequencialVendaAsync(string terminalId, CancellationToken cancellationToken = default)
+    {
+        var term = string.IsNullOrWhiteSpace(terminalId) ? "CX01" : terminalId.Trim();
+        var ultimo = await _dbSet
+            .Where(v => v.TerminalId == term)
+            .OrderByDescending(v => v.NumeroSequencial)
+            .Select(v => v.NumeroSequencial)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return ultimo + 1;
+    }
+}
+
+public class SincronizacaoRepository : Repository<RegistroSincronizacao>, ISincronizacaoRepository
+{
+    public SincronizacaoRepository(PdvDbContext context) : base(context) { }
+
+    public async Task<List<RegistroSincronizacao>> ObterPendentesAsync(int limite = 50, CancellationToken cancellationToken = default)
+    {
+        return await _dbSet
+            .Where(s => s.Status == Domain.Enums.StatusSincronizacao.Pendente)
+            .OrderBy(s => s.CriadoEm)
+            .Take(limite)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<int> ObterTotalPendentesAsync(CancellationToken cancellationToken = default)
+    {
+        return await _dbSet
+            .CountAsync(s => s.Status == Domain.Enums.StatusSincronizacao.Pendente, cancellationToken);
+    }
+
+    public async Task<DateTime?> ObterDataUltimaSincronizacaoAsync(CancellationToken cancellationToken = default)
+    {
+        return await _dbSet
+            .Where(s => s.Status == Domain.Enums.StatusSincronizacao.Sincronizado && s.SincronizadoEm.HasValue)
+            .OrderByDescending(s => s.SincronizadoEm)
+            .Select(s => s.SincronizadoEm)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
 }

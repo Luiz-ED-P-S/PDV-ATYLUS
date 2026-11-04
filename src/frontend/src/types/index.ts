@@ -60,6 +60,9 @@ export interface Venda {
   id: string;
   caixaId: string;
   operadorId: string;
+  terminalId?: string;
+  numeroSequencial?: number;
+  codigoIdentificador?: string;
   clienteNome?: string;
   clienteDocumento?: string;
   dataVenda: string;
@@ -126,3 +129,20 @@ export interface NfeXmlProdutoItem {
   margemSugeridaPercentual: number;
   precoVendaSugerido: number;
 }
+
+export interface StatusSincronizacao {
+  online: boolean;
+  pendentes: number;
+  ultimaSincronizacao?: string;
+  terminalId: string;
+  cloudUrl: string;
+  ultimoStatus: string;
+}
+
+export interface ResultadoSincronizacao {
+  sucesso: boolean;
+  sincronizados: number;
+  falhas: number;
+  mensagem: string;
+}
+

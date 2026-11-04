@@ -43,6 +43,33 @@ public interface IVendaRepository : IRepository<Venda>
     Task<List<Venda>> ObterTodasVendasAsync(CancellationToken cancellationToken = default);
     Task<List<Venda>> ObterVendasPorCaixaAsync(Guid caixaId, CancellationToken cancellationToken = default);
     Task<Venda?> ObterVendaCompletaPorIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<int> ObterProximoSequencialVendaAsync(string terminalId, CancellationToken cancellationToken = default);
+}
+
+public interface ISincronizacaoRepository : IRepository<RegistroSincronizacao>
+{
+    Task<List<RegistroSincronizacao>> ObterPendentesAsync(int limite = 50, CancellationToken cancellationToken = default);
+    Task<int> ObterTotalPendentesAsync(CancellationToken cancellationToken = default);
+    Task<DateTime?> ObterDataUltimaSincronizacaoAsync(CancellationToken cancellationToken = default);
+}
+
+public record StatusSincronizacaoDto(
+    bool Online,
+    int Pendentes,
+    DateTime? UltimaSincronizacao,
+    string TerminalId,
+    string CloudUrl,
+    string UltimoStatus);
+
+public record ResultadoSincronizacao(bool Sucesso, int Sincronizados, int Falhas, string Mensagem);
+
+public interface ICloudSyncService
+{
+    Task EnfileirarAsync(string tipoEntidade, Guid entidadeId, string operacao, object payload, string? terminalId = null, CancellationToken cancellationToken = default);
+    Task<ResultadoSincronizacao> SincronizarFilaAsync(CancellationToken cancellationToken = default);
+    Task<StatusSincronizacaoDto> ObterStatusAsync(CancellationToken cancellationToken = default);
+    Task<bool> TestarConexaoNuvemAsync(CancellationToken cancellationToken = default);
+    void AtualizarConfiguracao(string? cloudUrl, string? terminalId, string? apiKey);
 }
 
 public interface IPixService

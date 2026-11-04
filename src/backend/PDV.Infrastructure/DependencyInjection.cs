@@ -48,12 +48,14 @@ public static class DependencyInjection
         services.AddScoped<ICaixaRepository, CaixaRepository>();
         services.AddScoped<IVendaRepository, VendaRepository>();
         services.AddScoped<IOperadorRepository, OperadorRepository>();
+        services.AddScoped<ISincronizacaoRepository, SincronizacaoRepository>();
 
         // Serviços Externos e de Suporte
         services.AddSingleton<IPixService, PixSimulatorService>();
         services.AddScoped<IGoogleDriveBackupService, GoogleDriveBackupService>();
         services.AddScoped<IThermalPrinterService, ThermalPrinterService>();
         services.AddHttpClient<ISpreadsheetAiService, SpreadsheetAiService>();
+        services.AddHttpClient<ICloudSyncService, CloudSyncService>();
 
         return services;
     }

@@ -30,11 +30,16 @@ public class CriarProdutoCommandValidator : AbstractValidator<CriarProdutoComman
 public class CriarProdutoCommandHandler : IRequestHandler<CriarProdutoCommand, ProdutoDto>
 {
     private readonly IProdutoRepository _produtoRepository;
+    private readonly ICloudSyncService _cloudSyncService;
     private readonly IUnitOfWork _unitOfWork;
 
-    public CriarProdutoCommandHandler(IProdutoRepository produtoRepository, IUnitOfWork unitOfWork)
+    public CriarProdutoCommandHandler(
+        IProdutoRepository produtoRepository,
+        ICloudSyncService cloudSyncService,
+        IUnitOfWork unitOfWork)
     {
         _produtoRepository = produtoRepository;
+        _cloudSyncService = cloudSyncService;
         _unitOfWork = unitOfWork;
     }
 
@@ -55,6 +60,16 @@ public class CriarProdutoCommandHandler : IRequestHandler<CriarProdutoCommand, P
         await _produtoRepository.AdicionarAsync(produto, cancellationToken);
         await _unitOfWork.CommitAsync(cancellationToken);
 
-        return ProdutoDto.FromEntity(produto);
+        var dto = ProdutoDto.FromEntity(produto);
+        try
+        {
+            await _cloudSyncService.EnfileirarAsync("Produto", produto.Id, "Criar", dto, null, cancellationToken);
+        }
+        catch
+        {
+            // Standby local garantido
+        }
+
+        return dto;
     }
 }

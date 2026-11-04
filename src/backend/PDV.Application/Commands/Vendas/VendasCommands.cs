@@ -25,7 +25,8 @@ public record CriarVendaCommand(
     List<CriarVendaItemInput> Itens,
     List<CriarVendaPagamentoInput> Pagamentos,
     string? ClienteNome = null,
-    string? ClienteDocumento = null) : IRequest<VendaDto>;
+    string? ClienteDocumento = null,
+    string? TerminalId = null) : IRequest<VendaDto>;
 
 public class CriarVendaCommandValidator : AbstractValidator<CriarVendaCommand>
 {
@@ -52,17 +53,20 @@ public class CriarVendaCommandHandler : IRequestHandler<CriarVendaCommand, Venda
     private readonly IVendaRepository _vendaRepository;
     private readonly ICaixaRepository _caixaRepository;
     private readonly IProdutoRepository _produtoRepository;
+    private readonly ICloudSyncService _cloudSyncService;
     private readonly IUnitOfWork _unitOfWork;
 
     public CriarVendaCommandHandler(
         IVendaRepository vendaRepository,
         ICaixaRepository caixaRepository,
         IProdutoRepository produtoRepository,
+        ICloudSyncService cloudSyncService,
         IUnitOfWork unitOfWork)
     {
         _vendaRepository = vendaRepository;
         _caixaRepository = caixaRepository;
         _produtoRepository = produtoRepository;
+        _cloudSyncService = cloudSyncService;
         _unitOfWork = unitOfWork;
     }
 
@@ -72,11 +76,21 @@ public class CriarVendaCommandHandler : IRequestHandler<CriarVendaCommand, Venda
         if (caixaAberto == null)
             throw new DomainException("Não é possível realizar vendas: nenhum caixa está aberto no momento. Abra o caixa primeiro [F3].");
 
+        var terminalId = string.IsNullOrWhiteSpace(request.TerminalId) ? "CX01" : request.TerminalId.Trim().ToUpper();
+        var proximoSequencial = await _vendaRepository.ObterProximoSequencialVendaAsync(terminalId, cancellationToken);
+
         await _unitOfWork.BeginTransactionAsync(cancellationToken);
 
         try
         {
-            var venda = new Venda(caixaAberto.Id, request.OperadorId, request.Desconto, request.ClienteNome, request.ClienteDocumento);
+            var venda = new Venda(
+                caixaAberto.Id,
+                request.OperadorId,
+                request.Desconto,
+                request.ClienteNome,
+                request.ClienteDocumento,
+                terminalId,
+                proximoSequencial);
 
             // Processa e debita os itens do estoque
             foreach (var itemInput in request.Itens)
@@ -111,7 +125,19 @@ public class CriarVendaCommandHandler : IRequestHandler<CriarVendaCommand, Venda
             await _vendaRepository.AdicionarAsync(venda, cancellationToken);
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
 
-            return VendaDto.FromEntity(venda);
+            var vendaDto = VendaDto.FromEntity(venda);
+
+            // Enfileira sincronização offline-first para nuvem em background
+            try
+            {
+                await _cloudSyncService.EnfileirarAsync("Venda", venda.Id, "Criar", vendaDto, venda.TerminalId, cancellationToken);
+            }
+            catch
+            {
+                // Standby local intacto mesmo com falha no enfileiramento secundário
+            }
+
+            return vendaDto;
         }
         catch
         {
@@ -128,17 +154,20 @@ public class CancelarVendaCommandHandler : IRequestHandler<CancelarVendaCommand,
     private readonly IVendaRepository _vendaRepository;
     private readonly IProdutoRepository _produtoRepository;
     private readonly IOperadorRepository _operadorRepository;
+    private readonly ICloudSyncService _cloudSyncService;
     private readonly IUnitOfWork _unitOfWork;
 
     public CancelarVendaCommandHandler(
         IVendaRepository vendaRepository,
         IProdutoRepository produtoRepository,
         IOperadorRepository operadorRepository,
+        ICloudSyncService cloudSyncService,
         IUnitOfWork unitOfWork)
     {
         _vendaRepository = vendaRepository;
         _produtoRepository = produtoRepository;
         _operadorRepository = operadorRepository;
+        _cloudSyncService = cloudSyncService;
         _unitOfWork = unitOfWork;
     }
 
@@ -177,6 +206,21 @@ public class CancelarVendaCommandHandler : IRequestHandler<CancelarVendaCommand,
 
             await _vendaRepository.AtualizarAsync(venda, cancellationToken);
             await _unitOfWork.CommitTransactionAsync(cancellationToken);
+
+            try
+            {
+                await _cloudSyncService.EnfileirarAsync(
+                    "Venda",
+                    venda.Id,
+                    "Cancelar",
+                    new { VendaId = venda.Id, Motivo = venda.MotivoCancelamento, CanceladoEm = DateTime.UtcNow },
+                    venda.TerminalId,
+                    cancellationToken);
+            }
+            catch
+            {
+                // Standby local garantido
+            }
 
             return true;
         }

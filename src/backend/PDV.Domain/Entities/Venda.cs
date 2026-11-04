@@ -7,6 +7,9 @@ public class Venda : BaseEntity
 {
     public Guid CaixaId { get; private set; }
     public string OperadorId { get; private set; } = string.Empty;
+    public string TerminalId { get; private set; } = "CX01";
+    public int NumeroSequencial { get; private set; } = 1;
+    public string CodigoIdentificador => $"{TerminalId}-{NumeroSequencial:D6}";
     public DateTime DataVenda { get; private set; } = DateTime.UtcNow;
     public decimal ValorTotal { get; private set; }
     public decimal Desconto { get; private set; }
@@ -24,7 +27,14 @@ public class Venda : BaseEntity
 
     protected Venda() { }
 
-    public Venda(Guid caixaId, string operadorId, decimal desconto = 0, string? clienteNome = null, string? clienteDocumento = null)
+    public Venda(
+        Guid caixaId,
+        string operadorId,
+        decimal desconto = 0,
+        string? clienteNome = null,
+        string? clienteDocumento = null,
+        string? terminalId = null,
+        int numeroSequencial = 1)
     {
         if (caixaId == Guid.Empty)
             throw new DomainException("O identificador do caixa é obrigatório para registrar uma venda.");
@@ -34,6 +44,8 @@ public class Venda : BaseEntity
 
         CaixaId = caixaId;
         OperadorId = string.IsNullOrWhiteSpace(operadorId) ? "OPERADOR_PADRAO" : operadorId.Trim();
+        TerminalId = string.IsNullOrWhiteSpace(terminalId) ? "CX01" : terminalId.Trim();
+        NumeroSequencial = numeroSequencial > 0 ? numeroSequencial : 1;
         DataVenda = DateTime.UtcNow;
         Desconto = desconto;
         Status = StatusVenda.Concluida;
