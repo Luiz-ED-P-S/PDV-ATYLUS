@@ -44,6 +44,20 @@ public class SyncController : ControllerBase
         return Ok(new { message = "Configuração de sincronização em nuvem atualizada com sucesso." });
     }
 
+    [HttpPost("puxar-catalogo")]
+    public async Task<ActionResult<ResultadoSincronizacao>> PuxarCatalogoNuvem(CancellationToken cancellationToken)
+    {
+        var resultado = await _cloudSyncService.BaixarCatalogoNuvemAsync(cancellationToken);
+        return Ok(resultado);
+    }
+
+    [HttpPost("heartbeat")]
+    public IActionResult ReceberHeartbeat([FromBody] HeartbeatPayloadRequest payload)
+    {
+        _logger.LogInformation("Heartbeat recebido do terminal {Terminal} (Versão {Versao}) com {Pendentes} pendentes.", payload.TerminalId, payload.Versao, payload.Pendentes);
+        return Ok(new { sucesso = true, timestamp = DateTime.UtcNow });
+    }
+
     [HttpPost("receber-lote")]
     public IActionResult ReceberLote([FromBody] List<LoteSincronizacaoItemRequest> itens)
     {
@@ -59,6 +73,13 @@ public class SyncController : ControllerBase
 }
 
 public record AtualizarConfigSyncRequest(string? CloudUrl, string? TerminalId, string? ApiKey);
+
+public record HeartbeatPayloadRequest(
+    string TerminalId,
+    string Versao,
+    int Pendentes,
+    string Hostname,
+    DateTime DataHora);
 
 public record LoteSincronizacaoItemRequest(
     Guid Id,

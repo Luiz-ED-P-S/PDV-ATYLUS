@@ -45,6 +45,15 @@ using (var scope = app.Services.CreateScope())
     var context = scope.ServiceProvider.GetRequiredService<PdvDbContext>();
     context.Database.EnsureCreated();
 
+    try
+    {
+        context.Database.ExecuteSqlRaw("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA foreign_keys=ON;");
+    }
+    catch
+    {
+        // Contingência para provedores em memória ou bloqueios transitórios
+    }
+
     // Cria operadores padrão caso a tabela esteja vazia
     if (!context.Operadores.Any())
     {

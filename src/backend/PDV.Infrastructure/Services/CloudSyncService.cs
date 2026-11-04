@@ -10,6 +10,7 @@ namespace PDV.Infrastructure.Services;
 public class CloudSyncService : ICloudSyncService
 {
     private readonly ISincronizacaoRepository _sincronizacaoRepository;
+    private readonly IProdutoRepository _produtoRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly HttpClient _httpClient;
     private readonly ILogger<CloudSyncService> _logger;
@@ -23,12 +24,14 @@ public class CloudSyncService : ICloudSyncService
 
     public CloudSyncService(
         ISincronizacaoRepository sincronizacaoRepository,
+        IProdutoRepository produtoRepository,
         IUnitOfWork unitOfWork,
         HttpClient httpClient,
         IConfiguration configuration,
         ILogger<CloudSyncService> logger)
     {
         _sincronizacaoRepository = sincronizacaoRepository;
+        _produtoRepository = produtoRepository;
         _unitOfWork = unitOfWork;
         _httpClient = httpClient;
         _httpClient.Timeout = TimeSpan.FromSeconds(5);
@@ -284,4 +287,118 @@ public class CloudSyncService : ICloudSyncService
             CloudUrl: _cloudUrl,
             UltimoStatus: statusDesc);
     }
+
+    public async Task<ResultadoSincronizacao> BaixarCatalogoNuvemAsync(CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(_cloudUrl))
+            return new ResultadoSincronizacao(false, 0, 0, "URL da Nuvem não configurada.");
+
+        var online = await TestarConexaoNuvemAsync(cancellationToken);
+        if (!online)
+            return new ResultadoSincronizacao(false, 0, 0, "Sem conexão com o servidor de Nuvem.");
+
+        try
+        {
+            var uri = new Uri(new Uri(_cloudUrl), $"/api/v1/sync/catalogo-atualizado?terminalId={_terminalId}").ToString();
+            using var req = new HttpRequestMessage(HttpMethod.Get, uri);
+            if (!string.IsNullOrWhiteSpace(_apiKey))
+            {
+                req.Headers.Add("X-PDV-ApiKey", _apiKey);
+            }
+
+            var resp = await _httpClient.SendAsync(req, cancellationToken);
+            if (!resp.IsSuccessStatusCode)
+            {
+                return new ResultadoSincronizacao(false, 0, 1, $"Falha ao baixar catálogo: {resp.StatusCode}");
+            }
+
+            var produtosNuvem = await resp.Content.ReadFromJsonAsync<List<ProdutoNuvemSyncDto>>(cancellationToken: cancellationToken);
+            if (produtosNuvem == null || produtosNuvem.Count == 0)
+            {
+                return new ResultadoSincronizacao(true, 0, 0, "Nenhum produto pendente de atualização na nuvem.");
+            }
+
+            int atualizados = 0;
+            foreach (var item in produtosNuvem)
+            {
+                var local = await _produtoRepository.ObterPorCodigoBarrasAsync(item.CodigoBarras, cancellationToken);
+                if (local != null)
+                {
+                    local.AtualizarDados(
+                        item.Nome,
+                        item.PrecoVenda,
+                        item.PrecoCusto,
+                        local.EstoqueAtual,
+                        item.EstoqueMinimo);
+                    await _produtoRepository.AtualizarAsync(local, cancellationToken);
+                }
+                else
+                {
+                    var novo = new Produto(
+                        item.CodigoBarras,
+                        item.Nome,
+                        item.PrecoVenda,
+                        item.PrecoCusto,
+                        item.EstoqueAtual,
+                        item.EstoqueMinimo);
+                    await _produtoRepository.AdicionarAsync(novo, cancellationToken);
+                }
+                atualizados++;
+            }
+
+            await _unitOfWork.CommitAsync(cancellationToken);
+            _logger.LogInformation("Catálogo sincronizado da nuvem com sucesso: {Qtd} produtos processados.", atualizados);
+            return new ResultadoSincronizacao(true, atualizados, 0, $"Catálogo atualizado: {atualizados} produtos sincronizados da nuvem com sucesso!");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erro ao baixar catálogo da nuvem.");
+            return new ResultadoSincronizacao(false, 0, 1, $"Erro na sincronização de catálogo: {ex.Message}");
+        }
+    }
+
+    public async Task<ResultadoSincronizacao> EnviarHeartbeatAsync(CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(_cloudUrl))
+            return new ResultadoSincronizacao(false, 0, 0, "URL da Nuvem não configurada.");
+
+        try
+        {
+            var uri = new Uri(new Uri(_cloudUrl), "/api/v1/sync/heartbeat").ToString();
+            var pendentes = await _sincronizacaoRepository.ObterTotalPendentesAsync(cancellationToken);
+
+            using var req = new HttpRequestMessage(HttpMethod.Post, uri)
+            {
+                Content = JsonContent.Create(new
+                {
+                    TerminalId = _terminalId,
+                    Versao = "1.0.0-PRO",
+                    Pendentes = pendentes,
+                    Hostname = Environment.MachineName,
+                    DataHora = DateTime.UtcNow
+                })
+            };
+
+            if (!string.IsNullOrWhiteSpace(_apiKey))
+            {
+                req.Headers.Add("X-PDV-ApiKey", _apiKey);
+            }
+
+            var resp = await _httpClient.SendAsync(req, cancellationToken);
+            return new ResultadoSincronizacao(resp.IsSuccessStatusCode, 1, 0, "Telemetria enviada com sucesso.");
+        }
+        catch
+        {
+            return new ResultadoSincronizacao(false, 0, 1, "Falha ao enviar telemetria.");
+        }
+    }
 }
+
+public record ProdutoNuvemSyncDto(
+    Guid Id,
+    string CodigoBarras,
+    string Nome,
+    decimal PrecoVenda,
+    decimal PrecoCusto,
+    decimal EstoqueAtual,
+    decimal EstoqueMinimo);

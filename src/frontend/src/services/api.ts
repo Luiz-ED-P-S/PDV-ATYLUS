@@ -109,6 +109,11 @@ export const pdvApi = {
     return res.data;
   },
 
+  async puxarCatalogoNuvem(): Promise<ResultadoSincronizacao> {
+    const res = await api.post<ResultadoSincronizacao>('/sync/puxar-catalogo');
+    return res.data;
+  },
+
   async testarConexaoNuvem(): Promise<{ online: boolean }> {
     const res = await api.post<{ online: boolean }>('/sync/testar-conexao');
     return res.data;

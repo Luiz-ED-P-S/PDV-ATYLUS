@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Cloud, Volume2, HardDrive, Keyboard, CheckCircle2, Printer, Scissors, Inbox, Play, RefreshCw, AlertCircle, Server, Save } from 'lucide-react';
+import { Settings, Cloud, Volume2, HardDrive, Keyboard, CheckCircle2, Printer, Scissors, Inbox, Play, RefreshCw, AlertCircle, Server, Save, Download } from 'lucide-react';
 import { sound } from '../../services/sound';
 import { pdvApi } from '../../services/api';
 import { StatusSincronizacao } from '../../types';
@@ -52,6 +52,7 @@ export const SettingsView: React.FC = () => {
   const [salvandoSync, setSalvandoSync] = useState(false);
   const [syncFeedback, setSyncFeedback] = useState<{ tipo: 'ok' | 'err'; msg: string } | null>(null);
   const [sincronizandoAgora, setSincronizandoAgora] = useState(false);
+  const [baixandoCatalogo, setBaixandoCatalogo] = useState(false);
 
   useEffect(() => {
     carregarImpressoras();
@@ -66,6 +67,26 @@ export const SettingsView: React.FC = () => {
       if (status.cloudUrl) setCloudUrl(status.cloudUrl);
     } catch {
       // API backend offline
+    }
+  };
+
+  const puxarCatalogoAgora = async () => {
+    setBaixandoCatalogo(true);
+    setSyncFeedback(null);
+    try {
+      const res = await pdvApi.puxarCatalogoNuvem();
+      if (res.sucesso) {
+        sound.playSuccessChime();
+        setSyncFeedback({ tipo: 'ok', msg: res.mensagem });
+      } else {
+        sound.playErrorBeep();
+        setSyncFeedback({ tipo: 'err', msg: res.mensagem });
+      }
+    } catch (err: any) {
+      sound.playErrorBeep();
+      setSyncFeedback({ tipo: 'err', msg: `Erro ao baixar catálogo: ${err.message}` });
+    } finally {
+      setBaixandoCatalogo(false);
     }
   };
 
@@ -441,6 +462,16 @@ export const SettingsView: React.FC = () => {
               >
                 <Save className="w-3.5 h-3.5" />
                 <span>{salvandoSync ? 'Salvando...' : 'Salvar Configuração'}</span>
+              </button>
+
+              <button
+                onClick={puxarCatalogoAgora}
+                disabled={baixandoCatalogo}
+                className="px-4 py-2 bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white font-bold rounded-xl flex items-center gap-2 transition"
+                title="Puxar produtos e tabelas de preços atualizadas na nuvem para este PDV"
+              >
+                <Download className={`w-3.5 h-3.5 ${baixandoCatalogo ? 'animate-bounce text-white' : ''}`} />
+                <span>{baixandoCatalogo ? 'Baixando...' : 'Baixar Catálogo da Nuvem'}</span>
               </button>
 
               <button

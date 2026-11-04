@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Package, Check, X, RefreshCw, AlertCircle } from 'lucide-react';
+import { Search, Plus, Package, Check, X, RefreshCw, AlertCircle, Download } from 'lucide-react';
 import { Produto } from '../../types';
 import { pdvApi } from '../../services/api';
 
@@ -23,6 +23,7 @@ export const ProductsView: React.FC = () => {
   const [novoPrecoCusto, setNovoPrecoCusto] = useState<number>(0);
   const [novoEstoque, setNovoEstoque] = useState<number>(10);
   const [novaUnidade, setNovaUnidade] = useState<'UN' | 'KG'>('UN');
+  const [baixandoNuvem, setBaixandoNuvem] = useState(false);
 
   useEffect(() => {
     carregarProdutos();
@@ -38,6 +39,20 @@ export const ProductsView: React.FC = () => {
       setErro('Erro ao carregar produtos do banco de dados.');
     } finally {
       setCarregando(false);
+    }
+  };
+
+  const handlePuxarNuvem = async () => {
+    setBaixandoNuvem(true);
+    setErro(null);
+    try {
+      const res = await pdvApi.puxarCatalogoNuvem();
+      alert(res.mensagem);
+      await carregarProdutos();
+    } catch (err: any) {
+      setErro(`Falha ao sincronizar com nuvem: ${err.message || 'Erro de rede'}`);
+    } finally {
+      setBaixandoNuvem(false);
     }
   };
 
@@ -132,6 +147,16 @@ export const ProductsView: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={handlePuxarNuvem}
+            disabled={baixandoNuvem}
+            className="p-2.5 bg-emerald-950/60 hover:bg-emerald-900/60 text-emerald-300 rounded-xl border border-emerald-900/70 transition flex items-center gap-1.5 text-xs font-mono font-bold"
+            title="Puxar produtos e preços atualizados da nuvem"
+          >
+            <Download className={`w-3.5 h-3.5 ${baixandoNuvem ? 'animate-bounce text-emerald-400' : ''}`} />
+            <span>{baixandoNuvem ? 'Baixando...' : 'Nuvem'}</span>
+          </button>
+
           <button
             onClick={carregarProdutos}
             disabled={carregando}

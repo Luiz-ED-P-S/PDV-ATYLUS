@@ -67,6 +67,8 @@ public interface ICloudSyncService
 {
     Task EnfileirarAsync(string tipoEntidade, Guid entidadeId, string operacao, object payload, string? terminalId = null, CancellationToken cancellationToken = default);
     Task<ResultadoSincronizacao> SincronizarFilaAsync(CancellationToken cancellationToken = default);
+    Task<ResultadoSincronizacao> BaixarCatalogoNuvemAsync(CancellationToken cancellationToken = default);
+    Task<ResultadoSincronizacao> EnviarHeartbeatAsync(CancellationToken cancellationToken = default);
     Task<StatusSincronizacaoDto> ObterStatusAsync(CancellationToken cancellationToken = default);
     Task<bool> TestarConexaoNuvemAsync(CancellationToken cancellationToken = default);
     void AtualizarConfiguracao(string? cloudUrl, string? terminalId, string? apiKey);

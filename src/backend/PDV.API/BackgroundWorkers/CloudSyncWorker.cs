@@ -20,6 +20,7 @@ public class CloudSyncWorker : BackgroundService
 
         // Delay inicial breve de 5 segundos para subir a API
         await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+        int cicloContador = 0;
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -28,10 +29,20 @@ public class CloudSyncWorker : BackgroundService
                 using var scope = _serviceProvider.CreateScope();
                 var syncService = scope.ServiceProvider.GetRequiredService<ICloudSyncService>();
 
+                // 1. Sincronização Upstream (PDV -> Nuvem via Outbox)
                 var resultado = await syncService.SincronizarFilaAsync(stoppingToken);
                 if (resultado.Sincronizados > 0)
                 {
                     _logger.LogInformation("Ciclo de sincronização em nuvem finalizado: {Sincronizados} registros sincronizados.", resultado.Sincronizados);
+                }
+
+                // 2. A cada 4 ciclos (~60s): Downstream de Catálogo e Telemetria / Heartbeat
+                cicloContador++;
+                if (cicloContador >= 4)
+                {
+                    cicloContador = 0;
+                    await syncService.BaixarCatalogoNuvemAsync(stoppingToken);
+                    await syncService.EnviarHeartbeatAsync(stoppingToken);
                 }
             }
             catch (Exception ex)
