@@ -40,8 +40,15 @@ public class SyncController : ControllerBase
     [HttpPost("config")]
     public IActionResult AtualizarConfiguracao([FromBody] AtualizarConfigSyncRequest request)
     {
-        _cloudSyncService.AtualizarConfiguracao(request.CloudUrl, request.TerminalId, request.ApiKey);
-        return Ok(new { message = "Configuração de sincronização em nuvem atualizada com sucesso." });
+        _cloudSyncService.AtualizarConfiguracao(
+            request.CloudUrl,
+            request.TerminalId,
+            request.ApiKey,
+            request.EmpresaNome,
+            request.EmpresaCnpj,
+            request.EmpresaIe,
+            request.EmpresaEndereco);
+        return Ok(new { message = "Configuração de sincronização e dados da empresa atualizados com sucesso." });
     }
 
     [HttpPost("puxar-catalogo")]
@@ -72,7 +79,14 @@ public class SyncController : ControllerBase
     }
 }
 
-public record AtualizarConfigSyncRequest(string? CloudUrl, string? TerminalId, string? ApiKey);
+public record AtualizarConfigSyncRequest(
+    string? CloudUrl,
+    string? TerminalId,
+    string? ApiKey,
+    string? EmpresaNome = null,
+    string? EmpresaCnpj = null,
+    string? EmpresaIe = null,
+    string? EmpresaEndereco = null);
 
 public record HeartbeatPayloadRequest(
     string TerminalId,

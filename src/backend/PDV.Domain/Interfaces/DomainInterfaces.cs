@@ -51,6 +51,7 @@ public interface ISincronizacaoRepository : IRepository<RegistroSincronizacao>
     Task<List<RegistroSincronizacao>> ObterPendentesAsync(int limite = 50, CancellationToken cancellationToken = default);
     Task<int> ObterTotalPendentesAsync(CancellationToken cancellationToken = default);
     Task<DateTime?> ObterDataUltimaSincronizacaoAsync(CancellationToken cancellationToken = default);
+    Task<int> LimparSincronizadosAntigosAsync(int diasRetencao = 30, CancellationToken cancellationToken = default);
 }
 
 public record StatusSincronizacaoDto(
@@ -59,7 +60,11 @@ public record StatusSincronizacaoDto(
     DateTime? UltimaSincronizacao,
     string TerminalId,
     string CloudUrl,
-    string UltimoStatus);
+    string UltimoStatus,
+    string? EmpresaNome = "ATYLUS VAREJO & CONVENIÊNCIA",
+    string? EmpresaCnpj = "00.000.000/0001-00",
+    string? EmpresaIe = "ISENTO",
+    string? EmpresaEndereco = "RUA DO COMÉRCIO, 100 - CENTRO");
 
 public record ResultadoSincronizacao(bool Sucesso, int Sincronizados, int Falhas, string Mensagem);
 
@@ -71,7 +76,7 @@ public interface ICloudSyncService
     Task<ResultadoSincronizacao> EnviarHeartbeatAsync(CancellationToken cancellationToken = default);
     Task<StatusSincronizacaoDto> ObterStatusAsync(CancellationToken cancellationToken = default);
     Task<bool> TestarConexaoNuvemAsync(CancellationToken cancellationToken = default);
-    void AtualizarConfiguracao(string? cloudUrl, string? terminalId, string? apiKey);
+    void AtualizarConfiguracao(string? cloudUrl, string? terminalId, string? apiKey, string? empresaNome = null, string? empresaCnpj = null, string? empresaIe = null, string? empresaEndereco = null);
 }
 
 public interface IPixService

@@ -21,6 +21,7 @@ public class CloudSyncWorker : BackgroundService
         // Delay inicial breve de 5 segundos para subir a API
         await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
         int cicloContador = 0;
+        int cicloPurge = 0;
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -43,6 +44,19 @@ public class CloudSyncWorker : BackgroundService
                     cicloContador = 0;
                     await syncService.BaixarCatalogoNuvemAsync(stoppingToken);
                     await syncService.EnviarHeartbeatAsync(stoppingToken);
+                }
+
+                // 3. Purge periódico de manutenção da fila SQLite (registros sincronizados há mais de 30 dias)
+                cicloPurge++;
+                if (cicloPurge >= 200)
+                {
+                    cicloPurge = 0;
+                    var syncRepo = scope.ServiceProvider.GetRequiredService<ISincronizacaoRepository>();
+                    var removidos = await syncRepo.LimparSincronizadosAntigosAsync(30, stoppingToken);
+                    if (removidos > 0)
+                    {
+                        _logger.LogInformation("Manutenção da fila SQLite: {Qtd} registros antigos sincronizados expurgados.", removidos);
+                    }
                 }
             }
             catch (Exception ex)

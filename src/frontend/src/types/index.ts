@@ -137,6 +137,10 @@ export interface StatusSincronizacao {
   terminalId: string;
   cloudUrl: string;
   ultimoStatus: string;
+  empresaNome?: string;
+  empresaCnpj?: string;
+  empresaIe?: string;
+  empresaEndereco?: string;
 }
 
 export interface ResultadoSincronizacao {

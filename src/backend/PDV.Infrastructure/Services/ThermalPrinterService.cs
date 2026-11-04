@@ -65,36 +65,57 @@ public class ThermalPrinterService : IThermalPrinterService
         config ??= _configPadrao;
         var builder = new EscPosBuilder(config.Largura);
 
+        string empresaNome = "ATYLUS VAREJO & CONVENIÊNCIA";
+        string empresaCnpj = "00.000.000/0001-00";
+        string empresaIe = "ISENTO";
+        string empresaEndereco = "RUA DO COMÉRCIO, 100 - CENTRO";
+
+        try
+        {
+            var appData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "PDV-ATYLUS", "cloud_sync_config.json");
+            if (File.Exists(appData))
+            {
+                var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(appData));
+                if (doc.RootElement.TryGetProperty("EmpresaNome", out var n) && !string.IsNullOrWhiteSpace(n.GetString())) empresaNome = n.GetString()!;
+                if (doc.RootElement.TryGetProperty("EmpresaCnpj", out var c) && !string.IsNullOrWhiteSpace(c.GetString())) empresaCnpj = c.GetString()!;
+                if (doc.RootElement.TryGetProperty("EmpresaIe", out var ie) && !string.IsNullOrWhiteSpace(ie.GetString())) empresaIe = ie.GetString()!;
+                if (doc.RootElement.TryGetProperty("EmpresaEndereco", out var e) && !string.IsNullOrWhiteSpace(e.GetString())) empresaEndereco = e.GetString()!;
+            }
+        }
+        catch
+        {
+            // Fallback padrão
+        }
+
         // Cabeçalho da Empresa
         builder.AlinharCentro()
                .TamanhoDuplo(true)
                .Negrito(true)
-               .Linha("ATYLUS PDV")
+               .Linha(empresaNome)
                .TamanhoDuplo(false)
                .Negrito(false)
-               .Linha("SISTEMA DE FRENTE DE CAIXA")
-               .Linha("CNPJ: 00.000.000/0001-00 - IE: ISENTO")
-               .Linha("RUA PRINCIPAL, 100 - CENTRO")
+               .Linha($"CNPJ: {empresaCnpj} - IE: {empresaIe}")
+               .Linha(empresaEndereco)
                .Divisor('=');
 
         // Identificação do Documento
         var dataLocal = venda.DataVenda.ToLocalTime();
         builder.AlinharCentro()
                .Negrito(true)
-               .Linha("COMPROVANTE DE VENDA - NÃO FISCAL")
+               .Linha("COMPROVANTE DE VENDA - CONTINGÊNCIA")
                .Negrito(false)
                .AlinharEsquerda()
-               .Linha($"Venda: #{venda.Id.ToString()[..8].ToUpper()}")
-               .Linha($"Data/Hora: {dataLocal:dd/MM/yyyy HH:mm:ss}")
-               .Linha($"Operador : {venda.OperadorId}");
+               .Linha($"Cupom / Terminal: #{venda.CodigoIdentificador}")
+               .Linha($"Data / Hora     : {dataLocal:dd/MM/yyyy HH:mm:ss}")
+               .Linha($"Operador Caixa  : {venda.OperadorId}");
 
         if (!string.IsNullOrWhiteSpace(venda.ClienteNome))
         {
-            builder.Linha($"Cliente  : {venda.ClienteNome}");
+            builder.Linha($"Cliente         : {venda.ClienteNome}");
         }
         if (!string.IsNullOrWhiteSpace(venda.ClienteDocumento))
         {
-            builder.Linha($"CPF/CNPJ : {venda.ClienteDocumento}");
+            builder.Linha($"CPF / CNPJ      : {venda.ClienteDocumento}");
         }
 
         builder.Divisor('-');
@@ -153,10 +174,16 @@ public class ThermalPrinterService : IThermalPrinterService
 
         builder.Divisor('=');
 
-        // Rodapé
+        // Rodapé de Contingência e Identificação Fiscal
         builder.AlinharCentro()
-               .Linha("Obrigado pela preferência!")
-               .Linha("Volte Sempre!")
+               .Negrito(true)
+               .Linha("EMITIDO EM CONTINGÊNCIA OFFLINE")
+               .Negrito(false)
+               .Linha($"Chave Única: {venda.Id.ToString("D").ToUpper()}")
+               .Linha("Consulta via QR Code / Portal do Consumidor")
+               .Divisor('-')
+               .Linha("Obrigado pela preferência! Volte Sempre!")
+               .Linha("ATYLUS PDV Desktop - Versão 1.0.0-PRO")
                .Linha("www.atylus.com.br")
                .AvancarLinhas(2);
 

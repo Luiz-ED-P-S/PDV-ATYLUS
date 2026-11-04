@@ -119,7 +119,15 @@ export const pdvApi = {
     return res.data;
   },
 
-  async atualizarConfigSync(config: { cloudUrl?: string; terminalId?: string; apiKey?: string }): Promise<void> {
+  async atualizarConfigSync(config: {
+    cloudUrl?: string;
+    terminalId?: string;
+    apiKey?: string;
+    empresaNome?: string;
+    empresaCnpj?: string;
+    empresaIe?: string;
+    empresaEndereco?: string;
+  }): Promise<void> {
     await api.post('/sync/config', config);
   },
 

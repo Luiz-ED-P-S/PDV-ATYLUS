@@ -18,6 +18,10 @@ public class CloudSyncService : ICloudSyncService
     private static string _terminalId = "CX01";
     private static string _cloudUrl = "";
     private static string _apiKey = "";
+    private static string _empresaNome = "ATYLUS VAREJO & CONVENIÊNCIA";
+    private static string _empresaCnpj = "00.000.000/0001-00";
+    private static string _empresaIe = "ISENTO";
+    private static string _empresaEndereco = "RUA DO COMÉRCIO, 100 - CENTRO";
     private static readonly object _lock = new();
 
     private readonly string _configFile;
@@ -57,6 +61,10 @@ public class CloudSyncService : ICloudSyncService
                     if (doc.RootElement.TryGetProperty("TerminalId", out var t)) _terminalId = t.GetString() ?? "CX01";
                     if (doc.RootElement.TryGetProperty("CloudUrl", out var u)) _cloudUrl = u.GetString() ?? "";
                     if (doc.RootElement.TryGetProperty("ApiKey", out var k)) _apiKey = k.GetString() ?? "";
+                    if (doc.RootElement.TryGetProperty("EmpresaNome", out var en) && !string.IsNullOrWhiteSpace(en.GetString())) _empresaNome = en.GetString()!;
+                    if (doc.RootElement.TryGetProperty("EmpresaCnpj", out var ec) && !string.IsNullOrWhiteSpace(ec.GetString())) _empresaCnpj = ec.GetString()!;
+                    if (doc.RootElement.TryGetProperty("EmpresaIe", out var ei) && !string.IsNullOrWhiteSpace(ei.GetString())) _empresaIe = ei.GetString()!;
+                    if (doc.RootElement.TryGetProperty("EmpresaEndereco", out var ee) && !string.IsNullOrWhiteSpace(ee.GetString())) _empresaEndereco = ee.GetString()!;
                     return;
                 }
                 catch
@@ -79,13 +87,24 @@ public class CloudSyncService : ICloudSyncService
         }
     }
 
-    public void AtualizarConfiguracao(string? cloudUrl, string? terminalId, string? apiKey)
+    public void AtualizarConfiguracao(
+        string? cloudUrl,
+        string? terminalId,
+        string? apiKey,
+        string? empresaNome = null,
+        string? empresaCnpj = null,
+        string? empresaIe = null,
+        string? empresaEndereco = null)
     {
         lock (_lock)
         {
             if (!string.IsNullOrWhiteSpace(terminalId)) _terminalId = terminalId.Trim();
             if (cloudUrl != null) _cloudUrl = cloudUrl.Trim();
             if (apiKey != null) _apiKey = apiKey.Trim();
+            if (!string.IsNullOrWhiteSpace(empresaNome)) _empresaNome = empresaNome.Trim();
+            if (!string.IsNullOrWhiteSpace(empresaCnpj)) _empresaCnpj = empresaCnpj.Trim();
+            if (!string.IsNullOrWhiteSpace(empresaIe)) _empresaIe = empresaIe.Trim();
+            if (!string.IsNullOrWhiteSpace(empresaEndereco)) _empresaEndereco = empresaEndereco.Trim();
 
             try
             {
@@ -93,7 +112,11 @@ public class CloudSyncService : ICloudSyncService
                 {
                     TerminalId = _terminalId,
                     CloudUrl = _cloudUrl,
-                    ApiKey = _apiKey
+                    ApiKey = _apiKey,
+                    EmpresaNome = _empresaNome,
+                    EmpresaCnpj = _empresaCnpj,
+                    EmpresaIe = _empresaIe,
+                    EmpresaEndereco = _empresaEndereco
                 }, new JsonSerializerOptions { WriteIndented = true });
 
                 File.WriteAllText(_configFile, payload);
@@ -285,7 +308,11 @@ public class CloudSyncService : ICloudSyncService
             UltimaSincronizacao: ultimaSinc,
             TerminalId: _terminalId,
             CloudUrl: _cloudUrl,
-            UltimoStatus: statusDesc);
+            UltimoStatus: statusDesc,
+            EmpresaNome: _empresaNome,
+            EmpresaCnpj: _empresaCnpj,
+            EmpresaIe: _empresaIe,
+            EmpresaEndereco: _empresaEndereco);
     }
 
     public async Task<ResultadoSincronizacao> BaixarCatalogoNuvemAsync(CancellationToken cancellationToken = default)

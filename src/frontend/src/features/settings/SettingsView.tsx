@@ -49,6 +49,10 @@ export const SettingsView: React.FC = () => {
   const [terminalId, setTerminalId] = useState('CX01');
   const [cloudUrl, setCloudUrl] = useState('');
   const [apiKey, setApiKey] = useState('');
+  const [empresaNome, setEmpresaNome] = useState('ATYLUS VAREJO & CONVENIÊNCIA');
+  const [empresaCnpj, setEmpresaCnpj] = useState('00.000.000/0001-00');
+  const [empresaIe, setEmpresaIe] = useState('ISENTO');
+  const [empresaEndereco, setEmpresaEndereco] = useState('RUA DO COMÉRCIO, 100 - CENTRO');
   const [salvandoSync, setSalvandoSync] = useState(false);
   const [syncFeedback, setSyncFeedback] = useState<{ tipo: 'ok' | 'err'; msg: string } | null>(null);
   const [sincronizandoAgora, setSincronizandoAgora] = useState(false);
@@ -65,6 +69,10 @@ export const SettingsView: React.FC = () => {
       setSyncStatus(status);
       if (status.terminalId) setTerminalId(status.terminalId);
       if (status.cloudUrl) setCloudUrl(status.cloudUrl);
+      if (status.empresaNome) setEmpresaNome(status.empresaNome);
+      if (status.empresaCnpj) setEmpresaCnpj(status.empresaCnpj);
+      if (status.empresaIe) setEmpresaIe(status.empresaIe);
+      if (status.empresaEndereco) setEmpresaEndereco(status.empresaEndereco);
     } catch {
       // API backend offline
     }
@@ -94,9 +102,17 @@ export const SettingsView: React.FC = () => {
     setSalvandoSync(true);
     setSyncFeedback(null);
     try {
-      await pdvApi.atualizarConfigSync({ terminalId, cloudUrl, apiKey });
+      await pdvApi.atualizarConfigSync({
+        terminalId,
+        cloudUrl,
+        apiKey,
+        empresaNome,
+        empresaCnpj,
+        empresaIe,
+        empresaEndereco,
+      });
       sound.playSuccessChime();
-      setSyncFeedback({ tipo: 'ok', msg: 'Configuração de terminal e nuvem salva com sucesso!' });
+      setSyncFeedback({ tipo: 'ok', msg: 'Configuração de terminal, empresa e nuvem salva com sucesso!' });
       await carregarSyncStatus();
     } catch (err: any) {
       sound.playErrorBeep();
@@ -420,6 +436,52 @@ export const SettingsView: React.FC = () => {
                 className="w-full px-3 py-2 bg-[#090f16] border border-[#1f3042] rounded-xl text-white font-mono text-xs focus:outline-none focus:border-emerald-500"
               />
               <span className="text-[10px] text-slate-500 block">Autenticação com o serviço em nuvem</span>
+            </div>
+          </div>
+
+          {/* Dados da Empresa / Loja Emissora */}
+          <div className="pt-2 border-t border-[#1a2938]">
+            <span className="text-slate-300 font-bold text-[11px] block mb-2">Identificação do Estabelecimento (Cabeçalho do Cupom & Recibos):</span>
+            <div className="grid grid-cols-4 gap-3">
+              <div className="space-y-1">
+                <label className="text-slate-400 text-[10px]">Razão Social / Nome Fantasia:</label>
+                <input
+                  type="text"
+                  value={empresaNome}
+                  onChange={e => setEmpresaNome(e.target.value)}
+                  className="w-full px-2.5 py-1.5 bg-[#090f16] border border-[#1f3042] rounded-lg text-white font-mono text-xs focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-slate-400 text-[10px]">CNPJ da Loja / Matriz:</label>
+                <input
+                  type="text"
+                  value={empresaCnpj}
+                  onChange={e => setEmpresaCnpj(e.target.value)}
+                  className="w-full px-2.5 py-1.5 bg-[#090f16] border border-[#1f3042] rounded-lg text-white font-mono text-xs focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-slate-400 text-[10px]">Inscrição Estadual (IE):</label>
+                <input
+                  type="text"
+                  value={empresaIe}
+                  onChange={e => setEmpresaIe(e.target.value)}
+                  className="w-full px-2.5 py-1.5 bg-[#090f16] border border-[#1f3042] rounded-lg text-white font-mono text-xs focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-slate-400 text-[10px]">Endereço / Cidade:</label>
+                <input
+                  type="text"
+                  value={empresaEndereco}
+                  onChange={e => setEmpresaEndereco(e.target.value)}
+                  className="w-full px-2.5 py-1.5 bg-[#090f16] border border-[#1f3042] rounded-lg text-white font-mono text-xs focus:outline-none focus:border-emerald-500"
+                />
+              </div>
             </div>
           </div>
 

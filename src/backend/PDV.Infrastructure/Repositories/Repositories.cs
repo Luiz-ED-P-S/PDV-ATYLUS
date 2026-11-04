@@ -182,4 +182,18 @@ public class SincronizacaoRepository : Repository<RegistroSincronizacao>, ISincr
             .Select(s => s.SincronizadoEm)
             .FirstOrDefaultAsync(cancellationToken);
     }
+
+    public async Task<int> LimparSincronizadosAntigosAsync(int diasRetencao = 30, CancellationToken cancellationToken = default)
+    {
+        var limiteData = DateTime.UtcNow.AddDays(-diasRetencao);
+        var antigos = await _dbSet
+            .Where(s => s.Status == Domain.Enums.StatusSincronizacao.Sincronizado && s.SincronizadoEm <= limiteData)
+            .ToListAsync(cancellationToken);
+
+        if (antigos.Count == 0) return 0;
+
+        _dbSet.RemoveRange(antigos);
+        await _context.SaveChangesAsync(cancellationToken);
+        return antigos.Count;
+    }
 }
