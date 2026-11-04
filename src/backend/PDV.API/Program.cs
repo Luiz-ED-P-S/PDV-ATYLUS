@@ -127,7 +127,7 @@ else
 app.UseAuthorization();
 app.MapControllers();
 
-// Endpoint de Healthcheck para inicialização rápida do Desktop (Tauri)
+// Endpoint de Healthcheck para verificação de status da API
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", version = "1.0.0", timestamp = DateTime.UtcNow }));
 
 // Fallback para SPA React (roteamento no cliente)

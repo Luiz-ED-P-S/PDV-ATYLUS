@@ -666,7 +666,7 @@ export const SettingsView: React.FC = () => {
             <div>• Backend: <strong>.NET 8 Clean Architecture com CQRS & MediatR</strong></div>
             <div>• Frontend: <strong>React 18 + TypeScript + Tailwind CSS</strong></div>
             <div>• Impressão Térmica: <strong>ESC/POS Direto (WinSpooler / Raw TCP 9100)</strong></div>
-            <div>• Empacotador Desktop: <strong>Tauri v2 / WebView2 Nativo Windows</strong></div>
+            <div>• Interface: <strong>Aplicação Web SPA (Navegador / Kiosk)</strong></div>
           </div>
         </div>
       </div>
