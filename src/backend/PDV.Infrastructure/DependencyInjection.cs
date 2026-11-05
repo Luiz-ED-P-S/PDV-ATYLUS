@@ -54,6 +54,7 @@ public static class DependencyInjection
         services.AddSingleton<IPixService, PixSimulatorService>();
         services.AddScoped<IGoogleDriveBackupService, GoogleDriveBackupService>();
         services.AddScoped<IThermalPrinterService, ThermalPrinterService>();
+        services.AddScoped<ITokenService, TokenService>();
         services.AddHttpClient<ISpreadsheetAiService, SpreadsheetAiService>();
         services.AddHttpClient<ICloudSyncService, CloudSyncService>();
 

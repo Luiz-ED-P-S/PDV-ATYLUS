@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Cloud, CloudOff, RefreshCw } from 'lucide-react';
+import { Clock, Cloud, CloudOff, RefreshCw, User, LogOut } from 'lucide-react';
 import { pdvApi } from '../services/api';
 import { StatusSincronizacao } from '../types';
+import { useAuthStore } from '../store/useAuthStore';
 
 export const DesktopTitlebar: React.FC = () => {
   const [hora, setHora] = useState(new Date().toLocaleTimeString('pt-BR'));
   const [syncStatus, setSyncStatus] = useState<StatusSincronizacao | null>(null);
   const [sincronizandoManual, setSincronizandoManual] = useState(false);
+  const operador = useAuthStore(state => state.operador);
 
   const carregarStatusSync = async () => {
     try {
@@ -102,6 +104,21 @@ export const DesktopTitlebar: React.FC = () => {
           <Clock className="w-3 h-3 text-sky-400" />
           <span className="font-bold text-slate-300">{hora}</span>
         </div>
+
+        {operador && (
+          <div className="flex items-center gap-1.5 bg-slate-900/80 border border-slate-800 px-2 py-0.5 rounded-md text-slate-300">
+            <User className="w-3 h-3 text-sky-400" />
+            <span className="font-bold text-slate-200">{operador.nome}</span>
+            <span className="text-[10px] text-slate-500 font-mono">({operador.matricula})</span>
+            <button
+              onClick={() => useAuthStore.getState().logout()}
+              title="Bloquear / Trocar Operador"
+              className="ml-1 p-0.5 text-rose-400 hover:text-rose-300 transition"
+            >
+              <LogOut className="w-3 h-3" />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

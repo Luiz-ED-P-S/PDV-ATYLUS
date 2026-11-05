@@ -129,3 +129,8 @@ public interface IThermalPrinterService
     Task<ResultadoImpressao> TestarImpressaoAsync(ConfiguracaoImpressora config, CancellationToken cancellationToken = default);
     List<string> ObterImpressorasInstaladas();
 }
+
+public interface ITokenService
+{
+    string GerarToken(Operador operador);
+}

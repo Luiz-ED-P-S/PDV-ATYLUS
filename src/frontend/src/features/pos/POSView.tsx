@@ -285,7 +285,7 @@ export const POSView: React.FC<POSViewProps> = ({ onAbrirImportador }) => {
         {/* Informações do Operador e Som */}
         <div className="flex items-center gap-4 text-xs font-mono text-slate-400">
           <div>
-            Operador: <strong className="text-slate-200">{operador.nome}</strong> ({operador.matricula})
+            Operador: <strong className="text-slate-200">{operador?.nome ?? 'N/A'}</strong> ({operador?.matricula ?? ''})
           </div>
 
           <button
