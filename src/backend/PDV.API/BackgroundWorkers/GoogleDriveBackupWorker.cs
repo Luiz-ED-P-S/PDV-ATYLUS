@@ -25,7 +25,7 @@ public class GoogleDriveBackupWorker : BackgroundService
         {
             try
             {
-                using var scope = _serviceProvider.CreateScope();
+                await using var scope = _serviceProvider.CreateAsyncScope();
                 var backupService = scope.ServiceProvider.GetRequiredService<IGoogleDriveBackupService>();
 
                 _logger.LogInformation("Executando ciclo agendado de backup do banco de dados...");
