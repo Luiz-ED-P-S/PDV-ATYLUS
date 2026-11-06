@@ -1,277 +1,596 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Lock, User, ShieldCheck, AlertCircle, Loader2 } from 'lucide-react';
+import { Lock, User, ShieldCheck, AlertCircle, CheckCircle2, Mail, KeyRound, ArrowRight, ArrowLeft, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { pdvApi } from '../services/api';
 import { OperadorListItem } from '../types';
 
 export const LoginScreen: React.FC = () => {
+  // Modo principal: 'email_auth' (Cadastro/Login por E-mail com BCrypt e OTP) ou 'pin_operador' (PIN rápido de caixa)
+  const [modo, setModo] = useState<'email_auth' | 'pin_operador'>('email_auth');
+
+  // Sub-abas do modo email_auth: 'login' | 'cadastro' | 'verificar_otp'
+  const [subAba, setSubAba] = useState<'login' | 'cadastro' | 'verificar_otp'>('login');
+
+  // Formulário E-mail / Senha / Cadastro
+  const [nomeCadastro, setNomeCadastro] = useState('');
+  const [email, setEmail] = useState('');
+  const [senha, setSenha] = useState('');
+  const [codigoOtp, setCodigoOtp] = useState('');
+
+  // Estados de feedback
+  const [erro, setErro] = useState('');
+  const [sucesso, setSucesso] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  // Estados do modo PIN Operador
   const [matricula, setMatricula] = useState('');
   const [pin, setPin] = useState('');
-  const [erro, setErro] = useState('');
-  const [loading, setLoading] = useState(false);
   const [operadores, setOperadores] = useState<OperadorListItem[]>([]);
   const [etapa, setEtapa] = useState<'matricula' | 'pin'>('matricula');
 
-  const login = useAuthStore(state => state.login);
+  const loginComPin = useAuthStore((state) => state.login);
+  const loginComEmail = useAuthStore((state) => state.loginComEmail);
 
   useEffect(() => {
-    pdvApi.listarOperadores().then(setOperadores);
+    pdvApi.listarOperadores().then(setOperadores).catch(() => {});
   }, []);
 
-  const handleNumeroClick = useCallback((num: string) => {
+  const limparMensagens = () => {
     setErro('');
-    if (etapa === 'matricula') {
-      // Matrícula é texto livre (pode ter letras e números)
-      // mas o teclado numérico é para o PIN
-    } else {
-      if (pin.length < 8) {
-        setPin(prev => prev + num);
-      }
-    }
-  }, [etapa, pin]);
+    setSucesso('');
+  };
 
-  const handleApagar = useCallback(() => {
-    if (etapa === 'pin') {
-      setPin(prev => prev.slice(0, -1));
-    } else {
-      setMatricula(prev => prev.slice(0, -1));
-    }
-    setErro('');
-  }, [etapa]);
+  // 1. Submissão de Login com E-mail e Senha (BCrypt)
+  const handleLoginEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    limparMensagens();
 
-  const handleSelecionarOperador = useCallback((op: OperadorListItem) => {
-    setMatricula(op.matricula);
-    setEtapa('pin');
-    setPin('');
-    setErro('');
-  }, []);
-
-  const handleVoltar = useCallback(() => {
-    setEtapa('matricula');
-    setPin('');
-    setErro('');
-  }, []);
-
-  const handleLogin = useCallback(async () => {
-    if (!matricula.trim()) {
-      setErro('Selecione um operador.');
-      return;
-    }
-    if (pin.length < 4) {
-      setErro('O PIN deve ter no mínimo 4 dígitos.');
+    if (!email || !senha) {
+      setErro('Informe o e-mail e a senha.');
       return;
     }
 
     setLoading(true);
-    setErro('');
+    try {
+      const res = await loginComEmail(email, senha);
+      if (!res.sucesso) {
+        setErro(res.mensagem);
+        // Se a mensagem mencionar conta não verificada, sugere ir para tela de verificação
+        if (res.mensagem.toLowerCase().includes('verificad')) {
+          setSubAba('verificar_otp');
+        }
+      }
+    } catch (err: any) {
+      setErro(err?.message || 'Falha ao autenticar.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const sucesso = await login(matricula, pin);
-    if (!sucesso) {
-      setErro('Matrícula ou PIN incorretos. Tente novamente.');
-      setPin('');
+  // 2. Submissão de Cadastro (gera código 6 dígitos e envia por e-mail/MailKit)
+  const handleCadastro = async (e: React.FormEvent) => {
+    e.preventDefault();
+    limparMensagens();
+
+    if (!nomeCadastro || !email || !senha) {
+      setErro('Preencha nome, e-mail e senha.');
+      return;
     }
 
-    setLoading(false);
-  }, [matricula, pin, login]);
+    if (senha.length < 6) {
+      setErro('A senha deve ter pelo menos 6 caracteres.');
+      return;
+    }
 
-  // Captura global de teclado para entrada rápida
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (loading) return;
-
-      if (e.key === 'Escape') {
-        if (etapa === 'pin') {
-          handleVoltar();
-        }
-        return;
+    setLoading(true);
+    try {
+      const res = await pdvApi.registrarUsuario(nomeCadastro, email, senha);
+      if (res.sucesso) {
+        setSucesso(res.mensagem);
+        setSubAba('verificar_otp');
+      } else {
+        setErro(res.mensagem || 'Falha ao criar conta.');
       }
+    } catch (err: any) {
+      setErro(err?.response?.data?.mensagem || err?.message || 'Erro ao registrar usuário.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      if (e.key === 'Backspace') {
-        e.preventDefault();
-        handleApagar();
-        return;
+  // 3. Submissão de Verificação de Código OTP
+  const handleVerificarCodigo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    limparMensagens();
+
+    if (!email || !codigoOtp) {
+      setErro('Informe o e-mail e o código numérico de 6 dígitos.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await pdvApi.verificarCodigoOtp(email, codigoOtp.trim());
+      if (res.sucesso) {
+        setSucesso('Conta verificada com sucesso! Você já pode entrar com sua senha.');
+        setCodigoOtp('');
+        setSubAba('login');
+      } else {
+        setErro(res.mensagem || 'Código inválido ou expirado.');
       }
+    } catch (err: any) {
+      setErro(err?.response?.data?.mensagem || err?.message || 'Código inválido ou expirado.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        if (etapa === 'pin' && pin.length >= 4) {
-          handleLogin();
-        }
-        return;
+  // Teclado numérico do Modo PIN Operador
+  const handleNumeroClick = useCallback((num: string) => {
+    setErro('');
+    if (etapa === 'matricula') {
+      setMatricula((prev) => (prev.length < 10 ? prev + num : prev));
+    } else {
+      setPin((prev) => (prev.length < 6 ? prev + num : prev));
+    }
+  }, [etapa]);
+
+  const handleBackspace = () => {
+    setErro('');
+    if (etapa === 'matricula') {
+      setMatricula((prev) => prev.slice(0, -1));
+    } else {
+      setPin((prev) => prev.slice(0, -1));
+    }
+  };
+
+  const handleAvancarEtapa = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!matricula.trim()) {
+      setErro('Informe ou selecione a matrícula do operador');
+      return;
+    }
+    setErro('');
+    setEtapa('pin');
+  };
+
+  const handleVoltarEtapa = () => {
+    setErro('');
+    setPin('');
+    setEtapa('matricula');
+  };
+
+  const handleLoginPin = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!pin) {
+      setErro('Digite o PIN de acesso');
+      return;
+    }
+    setLoading(true);
+    setErro('');
+    try {
+      const ok = await loginComPin(matricula.trim(), pin);
+      if (!ok) {
+        setErro('PIN incorreto ou operador inativo');
+        setPin('');
       }
-
-      if (etapa === 'pin' && /^[0-9]$/.test(e.key)) {
-        e.preventDefault();
-        handleNumeroClick(e.key);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [etapa, pin, loading, handleNumeroClick, handleApagar, handleVoltar, handleLogin]);
-
-  const numPad = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'];
-
-  const operadorSelecionado = operadores.find(o => o.matricula === matricula);
+    } catch {
+      setErro('Falha na comunicação com o servidor');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="w-screen h-screen bg-gradient-to-br from-[#060a10] via-[#0b1320] to-[#0d1a2a] flex items-center justify-center select-none">
-      <div className="w-full max-w-md mx-auto">
-        {/* Logo e Título */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 mb-4">
-            <ShieldCheck className="w-8 h-8 text-emerald-400" />
+    <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        {/* Topo do Header */}
+        <div className="text-center mb-6">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 mb-3 shadow-lg shadow-emerald-950/40">
+            <ShieldCheck size={36} />
           </div>
-          <h1 className="text-3xl font-black text-white tracking-wider">ATYLUS PDV</h1>
-          <p className="text-sm text-slate-400 mt-1 font-mono">Sistema de Ponto de Venda Seguro</p>
+          <h1 className="text-3xl font-black tracking-wider text-white">ATYLUS PDV</h1>
+          <p className="text-xs uppercase tracking-widest text-slate-400 font-semibold mt-1">
+            Sistema de Autenticação Segura &bull; .NET 8 + BCrypt + OTP
+          </p>
         </div>
 
-        {/* Card de Login */}
-        <div className="bg-[#0e1724] border border-[#1f3042] rounded-3xl p-6 shadow-2xl shadow-black/50">
-          {etapa === 'matricula' ? (
-            <>
-              {/* Etapa 1: Selecionar Operador */}
-              <div className="flex items-center gap-2 mb-4">
-                <User className="w-5 h-5 text-sky-400" />
-                <h2 className="text-lg font-bold text-white">Identificação do Operador</h2>
-              </div>
+        {/* Chaveador de Modo */}
+        <div className="grid grid-cols-2 gap-2 p-1 bg-slate-800/80 rounded-xl border border-slate-700/60 mb-5">
+          <button
+            type="button"
+            onClick={() => { setModo('email_auth'); limparMensagens(); }}
+            className={`py-2 px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${
+              modo === 'email_auth'
+                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-900/40'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Mail size={16} />
+            <span>Conta & E-mail (OTP)</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => { setModo('pin_operador'); limparMensagens(); }}
+            className={`py-2 px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${
+              modo === 'pin_operador'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-900/40'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <KeyRound size={16} />
+            <span>Operador Caixa (PIN)</span>
+          </button>
+        </div>
 
-              {operadores.length > 0 ? (
-                <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
-                  {operadores.map((op) => (
-                    <button
-                      key={op.id}
-                      onClick={() => handleSelecionarOperador(op)}
-                      className="w-full flex items-center gap-3 p-3 rounded-xl border border-slate-700/50 bg-slate-800/30 hover:bg-sky-950/40 hover:border-sky-800/50 transition text-left"
-                    >
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm ${
-                        op.perfil === 'Supervisor'
-                          ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                          : 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
-                      }`}>
-                        {op.matricula.slice(0, 2).toUpperCase()}
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-bold text-white text-sm">{op.nome}</p>
-                        <p className="text-[11px] text-slate-400 font-mono">{op.matricula} • {op.perfil}</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-slate-500 text-sm">
-                  <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-sky-400" />
-                  Carregando operadores...
-                </div>
-              )}
-            </>
-          ) : (
-            <>
-              {/* Etapa 2: Digitar PIN */}
-              <div className="flex items-center gap-2 mb-4">
-                <Lock className="w-5 h-5 text-emerald-400" />
-                <h2 className="text-lg font-bold text-white">PIN de Segurança</h2>
-              </div>
+        {/* Mensagens de Alerta Globais */}
+        {erro && (
+          <div className="mb-4 p-3.5 bg-rose-500/15 border border-rose-500/30 rounded-xl flex items-start gap-3 text-rose-300 text-sm animate-shake">
+            <AlertCircle size={18} className="shrink-0 mt-0.5" />
+            <span className="leading-snug">{erro}</span>
+          </div>
+        )}
 
-              {/* Operador selecionado */}
-              {operadorSelecionado && (
+        {sucesso && (
+          <div className="mb-4 p-3.5 bg-emerald-500/15 border border-emerald-500/30 rounded-xl flex items-start gap-3 text-emerald-300 text-sm">
+            <CheckCircle2 size={18} className="shrink-0 mt-0.5" />
+            <span className="leading-snug">{sucesso}</span>
+          </div>
+        )}
+
+        {/* CARD PRINCIPAL */}
+        <div className="bg-slate-800/90 rounded-2xl border border-slate-700/80 shadow-2xl overflow-hidden backdrop-blur-sm">
+          {modo === 'email_auth' ? (
+            <div>
+              {/* Abas Secundárias do Modo E-mail */}
+              <div className="flex border-b border-slate-700/80 bg-slate-900/40">
                 <button
-                  onClick={handleVoltar}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl border border-sky-800/40 bg-sky-950/30 mb-4 text-left hover:bg-sky-950/50 transition"
+                  type="button"
+                  onClick={() => { setSubAba('login'); limparMensagens(); }}
+                  className={`flex-1 py-3 text-xs font-bold transition-colors ${
+                    subAba === 'login'
+                      ? 'text-emerald-400 border-b-2 border-emerald-500 bg-slate-800/50'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
                 >
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm ${
-                    operadorSelecionado.perfil === 'Supervisor'
-                      ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                      : 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
-                  }`}>
-                    {operadorSelecionado.matricula.slice(0, 2).toUpperCase()}
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-bold text-white text-sm">{operadorSelecionado.nome}</p>
-                    <p className="text-[11px] text-slate-400 font-mono">{operadorSelecionado.matricula} • Clique para trocar</p>
-                  </div>
+                  Entrar
                 </button>
+                <button
+                  type="button"
+                  onClick={() => { setSubAba('cadastro'); limparMensagens(); }}
+                  className={`flex-1 py-3 text-xs font-bold transition-colors ${
+                    subAba === 'cadastro'
+                      ? 'text-emerald-400 border-b-2 border-emerald-500 bg-slate-800/50'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Criar Conta
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setSubAba('verificar_otp'); limparMensagens(); }}
+                  className={`flex-1 py-3 text-xs font-bold transition-colors ${
+                    subAba === 'verificar_otp'
+                      ? 'text-emerald-400 border-b-2 border-emerald-500 bg-slate-800/50'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Verificar Código
+                </button>
+              </div>
+
+              {/* Sub-Aba: 1. Login com Email/Senha */}
+              {subAba === 'login' && (
+                <form onSubmit={handleLoginEmail} className="p-6 space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                      E-mail Cadastrado
+                    </label>
+                    <div className="relative">
+                      <Mail className="absolute left-3.5 top-3.5 text-slate-500" size={18} />
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="usuario@empresa.com"
+                        required
+                        className="w-full bg-slate-950/60 border border-slate-700 rounded-xl py-3 pl-10 pr-4 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                      Senha (Criptografada com BCrypt)
+                    </label>
+                    <div className="relative">
+                      <Lock className="absolute left-3.5 top-3.5 text-slate-500" size={18} />
+                      <input
+                        type="password"
+                        value={senha}
+                        onChange={(e) => setSenha(e.target.value)}
+                        placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;"
+                        required
+                        className="w-full bg-slate-950/60 border border-slate-700 rounded-xl py-3 pl-10 pr-4 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-emerald-950/60 flex items-center justify-center gap-2 disabled:opacity-50 mt-2"
+                  >
+                    {loading ? <Loader2 size={18} className="animate-spin" /> : <ShieldCheck size={18} />}
+                    <span>{loading ? 'Validando BCrypt...' : 'Acessar PDV'}</span>
+                  </button>
+
+                  <div className="pt-2 text-center">
+                    <button
+                      type="button"
+                      onClick={() => { setSubAba('cadastro'); limparMensagens(); }}
+                      className="text-xs text-slate-400 hover:text-emerald-400 transition-colors"
+                    >
+                      Não tem conta? <span className="font-bold underline">Cadastre-se com verificação OTP</span>
+                    </button>
+                  </div>
+                </form>
               )}
 
-              {/* Campo de PIN (pontos) */}
-              <div className="flex justify-center gap-3 mb-5">
-                {[0, 1, 2, 3, 4, 5].map((i) => (
-                  <div
-                    key={i}
-                    className={`w-4 h-4 rounded-full transition-all duration-150 ${
-                      i < pin.length
-                        ? 'bg-emerald-400 shadow-md shadow-emerald-400/40 scale-110'
-                        : 'bg-slate-700 border border-slate-600'
-                    }`}
-                  />
-                ))}
-              </div>
+              {/* Sub-Aba: 2. Criar Nova Conta */}
+              {subAba === 'cadastro' && (
+                <form onSubmit={handleCadastro} className="p-6 space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                      Nome Completo
+                    </label>
+                    <div className="relative">
+                      <User className="absolute left-3.5 top-3.5 text-slate-500" size={18} />
+                      <input
+                        type="text"
+                        value={nomeCadastro}
+                        onChange={(e) => setNomeCadastro(e.target.value)}
+                        placeholder="Ex: Carlos Silva"
+                        required
+                        className="w-full bg-slate-950/60 border border-slate-700 rounded-xl py-3 pl-10 pr-4 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors text-sm"
+                      />
+                    </div>
+                  </div>
 
-              {/* Teclado Numérico */}
-              <div className="grid grid-cols-3 gap-2 mb-4">
-                {numPad.map((key, i) => {
-                  if (key === '') return <div key={i} />;
-                  if (key === '⌫') {
-                    return (
-                      <button
-                        key={i}
-                        onClick={handleApagar}
-                        className="h-14 rounded-xl bg-rose-950/40 border border-rose-900/40 text-rose-300 text-xl font-bold hover:bg-rose-900/50 active:scale-95 transition"
-                      >
-                        ⌫
-                      </button>
-                    );
-                  }
-                  return (
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                      E-mail para Receber o Código OTP
+                    </label>
+                    <div className="relative">
+                      <Mail className="absolute left-3.5 top-3.5 text-slate-500" size={18} />
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="carlos@empresa.com"
+                        required
+                        className="w-full bg-slate-950/60 border border-slate-700 rounded-xl py-3 pl-10 pr-4 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                      Senha Segura
+                    </label>
+                    <div className="relative">
+                      <Lock className="absolute left-3.5 top-3.5 text-slate-500" size={18} />
+                      <input
+                        type="password"
+                        value={senha}
+                        onChange={(e) => setSenha(e.target.value)}
+                        placeholder="Mínimo 6 caracteres"
+                        required
+                        className="w-full bg-slate-950/60 border border-slate-700 rounded-xl py-3 pl-10 pr-4 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-slate-400 leading-relaxed bg-slate-900/60 p-2.5 rounded-lg border border-slate-700/40">
+                    &bull; A senha será criptografada com <strong>BCrypt.Net-Next (work factor 12)</strong>.<br />
+                    &bull; Um código de 6 dígitos será enviado via <strong>MailKit</strong>.
+                  </p>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-emerald-950/60 flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {loading ? <Loader2 size={18} className="animate-spin" /> : <ArrowRight size={18} />}
+                    <span>{loading ? 'Cadastrando...' : 'Cadastrar e Gerar Código'}</span>
+                  </button>
+                </form>
+              )}
+
+              {/* Sub-Aba: 3. Validar Código OTP de 6 dígitos */}
+              {subAba === 'verificar_otp' && (
+                <form onSubmit={handleVerificarCodigo} className="p-6 space-y-4">
+                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs text-emerald-300 leading-relaxed">
+                    Digite o código de 6 dígitos enviado para o seu e-mail (válido por 15 minutos).
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                      E-mail da Conta
+                    </label>
+                    <div className="relative">
+                      <Mail className="absolute left-3.5 top-3.5 text-slate-500" size={18} />
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="usuario@empresa.com"
+                        required
+                        className="w-full bg-slate-950/60 border border-slate-700 rounded-xl py-3 pl-10 pr-4 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                      Código de 6 Dígitos
+                    </label>
+                    <div className="relative">
+                      <KeyRound className="absolute left-3.5 top-3.5 text-slate-500" size={18} />
+                      <input
+                        type="text"
+                        maxLength={6}
+                        value={codigoOtp}
+                        onChange={(e) => setCodigoOtp(e.target.value.replace(/\D/g, ''))}
+                        placeholder="123456"
+                        required
+                        className="w-full bg-slate-950/60 border border-slate-700 rounded-xl py-3 pl-10 pr-4 text-white text-center font-mono tracking-[0.4em] text-lg placeholder-slate-600 focus:outline-none focus:border-emerald-500 transition-colors"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading || codigoOtp.length !== 6}
+                    className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-emerald-950/60 flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {loading ? <Loader2 size={18} className="animate-spin" /> : <CheckCircle2 size={18} />}
+                    <span>{loading ? 'Verificando...' : 'Confirmar e Ativar Conta'}</span>
+                  </button>
+
+                  <div className="text-center pt-2">
                     <button
-                      key={i}
-                      onClick={() => handleNumeroClick(key)}
-                      className="h-14 rounded-xl bg-slate-800/60 border border-slate-700/50 text-white text-xl font-bold hover:bg-slate-700/60 active:scale-95 transition"
+                      type="button"
+                      onClick={() => { setSubAba('login'); limparMensagens(); }}
+                      className="text-xs text-slate-400 hover:text-slate-200 flex items-center justify-center gap-1 mx-auto"
                     >
-                      {key}
+                      <ArrowLeft size={14} /> Voltar para Login
                     </button>
-                  );
-                })}
-              </div>
+                  </div>
+                </form>
+              )}
+            </div>
+          ) : (
+            /* Modo Operador de Caixa (PIN rápido) */
+            <div className="p-6">
+              {etapa === 'matricula' ? (
+                <form onSubmit={handleAvancarEtapa} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                      Matrícula do Operador
+                    </label>
+                    <div className="relative">
+                      <User className="absolute left-3.5 top-3.5 text-slate-500" size={18} />
+                      <input
+                        type="text"
+                        value={matricula}
+                        onChange={(e) => setMatricula(e.target.value.toUpperCase())}
+                        placeholder="Ex: OP01, GER01"
+                        required
+                        className="w-full bg-slate-950/60 border border-slate-700 rounded-xl py-3 pl-10 pr-4 text-white uppercase font-mono placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors text-sm"
+                      />
+                    </div>
+                  </div>
 
-              {/* Botão de Login */}
-              <button
-                onClick={handleLogin}
-                disabled={loading || pin.length < 4}
-                className={`w-full h-14 rounded-xl font-bold text-base flex items-center justify-center gap-2 transition active:scale-[0.98] ${
-                  pin.length >= 4
-                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/30'
-                    : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                }`}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Autenticando...
-                  </>
-                ) : (
-                  <>
-                    <ShieldCheck className="w-5 h-5" />
-                    Entrar no Sistema [Enter]
-                  </>
-                )}
-              </button>
-            </>
-          )}
+                  {operadores.length > 0 && (
+                    <div>
+                      <p className="text-xs text-slate-400 mb-2 font-medium">Selecione rápido:</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {operadores.map((op) => (
+                          <button
+                            key={op.id}
+                            type="button"
+                            onClick={() => {
+                              setMatricula(op.matricula);
+                              setEtapa('pin');
+                            }}
+                            className="p-2.5 bg-slate-900/60 border border-slate-700/60 hover:border-blue-500/60 rounded-xl text-left transition-all hover:bg-blue-600/10"
+                          >
+                            <p className="font-bold text-xs text-white">{op.nome}</p>
+                            <p className="text-[10px] text-slate-400 font-mono">{op.matricula} &bull; {op.perfil}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
-          {/* Mensagem de Erro */}
-          {erro && (
-            <div className="mt-4 flex items-center gap-2 p-3 rounded-xl bg-rose-950/40 border border-rose-900/40 text-rose-300 text-sm">
-              <AlertCircle className="w-4 h-4 flex-shrink-0" />
-              <span>{erro}</span>
+                  <button
+                    type="submit"
+                    className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-950/60 flex items-center justify-center gap-2"
+                  >
+                    <span>Continuar para o PIN</span>
+                    <ArrowRight size={18} />
+                  </button>
+                </form>
+              ) : (
+                <form onSubmit={handleLoginPin} className="space-y-4">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-700/60">
+                    <div>
+                      <p className="text-xs text-slate-400">Operador</p>
+                      <p className="text-sm font-bold text-white font-mono">{matricula}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleVoltarEtapa}
+                      className="text-xs text-blue-400 hover:text-blue-300 font-semibold flex items-center gap-1"
+                    >
+                      <ArrowLeft size={14} /> Trocar
+                    </button>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5 text-center">
+                      Digite seu PIN (Teclado ou Tela)
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="password"
+                        maxLength={6}
+                        value={pin}
+                        onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+                        placeholder="&bull;&bull;&bull;&bull;"
+                        autoFocus
+                        className="w-full bg-slate-950/60 border border-slate-700 rounded-xl py-3 text-center text-white tracking-[0.5em] text-2xl font-mono focus:outline-none focus:border-blue-500 transition-colors"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Teclado numérico touch */}
+                  <div className="grid grid-cols-3 gap-2 pt-2">
+                    {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'].map((btn) => (
+                      <button
+                        key={btn}
+                        type="button"
+                        onClick={() => {
+                          if (btn === 'C') setPin('');
+                          else if (btn === '⌫') handleBackspace();
+                          else handleNumeroClick(btn);
+                        }}
+                        className="py-3 bg-slate-900/80 hover:bg-slate-700/80 text-white font-bold text-lg rounded-xl border border-slate-700/60 active:scale-95 transition-all shadow-sm"
+                      >
+                        {btn}
+                      </button>
+                    ))}
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading || !pin}
+                    className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-950/60 flex items-center justify-center gap-2 disabled:opacity-50 mt-2"
+                  >
+                    {loading ? <Loader2 size={18} className="animate-spin" /> : <Lock size={18} />}
+                    <span>{loading ? 'Entrando...' : 'Entrar no Caixa'}</span>
+                  </button>
+                </form>
+              )}
             </div>
           )}
         </div>
 
-        {/* Rodapé */}
-        <p className="text-center text-[10px] text-slate-600 mt-4 font-mono">
-          Autenticação criptografada BCrypt + JWT-HMAC256 • Sessão segura de 12 horas
-        </p>
+        {/* Rodapé informativo */}
+        <div className="text-center mt-5 text-[11px] text-slate-500">
+          ATYLUS PDV &bull; C# ASP.NET Core (.NET 8) Web API &bull; React TypeScript
+        </div>
       </div>
     </div>
   );

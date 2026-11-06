@@ -8,6 +8,7 @@ interface AuthState {
   carregando: boolean;
 
   login: (matricula: string, pin: string) => Promise<boolean>;
+  loginComEmail: (email: string, senha: string) => Promise<{ sucesso: boolean; mensagem: string }>;
   logout: () => void;
   restaurarSessao: () => Promise<void>;
   validarSupervisor: (pin: string, matricula?: string) => Promise<boolean>;
@@ -33,6 +34,28 @@ export const useAuthStore = create<AuthState>((set) => ({
       return true;
     } catch {
       return false;
+    }
+  },
+
+  loginComEmail: async (email: string, senha: string): Promise<{ sucesso: boolean; mensagem: string }> => {
+    try {
+      const response = await pdvApi.loginUsuario(email, senha);
+      if (response.sucesso && response.usuario) {
+        set({
+          operador: {
+            id: response.usuario.id,
+            matricula: response.usuario.email.split('@')[0].toUpperCase(),
+            nome: response.usuario.nome,
+            perfil: 'Supervisor',
+          },
+          autenticado: true,
+        });
+        return { sucesso: true, mensagem: response.mensagem };
+      }
+      return { sucesso: false, mensagem: response.mensagem || 'Falha ao autenticar.' };
+    } catch (err: any) {
+      const msg = err.response?.data?.mensagem || 'E-mail ou senha incorretos.';
+      return { sucesso: false, mensagem: msg };
     }
   },
 

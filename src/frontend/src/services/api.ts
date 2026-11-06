@@ -34,7 +34,26 @@ api.interceptors.response.use(
 );
 
 export const pdvApi = {
-  // === Autenticação ===
+  // === Autenticação com E-mail, BCrypt e OTP ===
+  async registrarUsuario(nome: string, email: string, senha: string): Promise<{ sucesso: boolean; mensagem: string; usuario?: any }> {
+    const res = await axios.post('/api/auth/register', { nome, email, senha });
+    return res.data;
+  },
+
+  async verificarCodigoOtp(email: string, codigo: string): Promise<{ sucesso: boolean; mensagem: string }> {
+    const res = await axios.post('/api/auth/verify', { email, codigo });
+    return res.data;
+  },
+
+  async loginUsuario(email: string, senha: string): Promise<{ sucesso: boolean; mensagem: string; token?: string; usuario?: any }> {
+    const res = await axios.post('/api/auth/login', { email, senha });
+    if (res.data.token) {
+      localStorage.setItem(TOKEN_KEY, res.data.token);
+    }
+    return res.data;
+  },
+
+  // === Autenticação por Matrícula/PIN (Operador) ===
   async login(matricula: string, pin: string): Promise<LoginResponse> {
     const res = await api.post<LoginResponse>('/auth/login', { matricula, pin });
     localStorage.setItem(TOKEN_KEY, res.data.token);
