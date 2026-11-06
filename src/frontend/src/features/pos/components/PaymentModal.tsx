@@ -254,8 +254,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onV
                       type="number"
                       step="0.01"
                       max={restante}
-                      value={valorParcela}
-                      onChange={e => setValorParcela(Math.min(restante, parseFloat(e.target.value) || 0))}
+                      value={valorParcela || ''}
+                      onFocus={e => e.target.select()}
+                      onChange={e => setValorParcela(e.target.value === '' ? 0 : Math.min(restante, parseFloat(e.target.value) || 0))}
                       className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xl font-bold font-mono text-white mt-1"
                     />
                   </div>
@@ -264,8 +265,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onV
                     <input
                       type="number"
                       step="0.01"
-                      value={dinheiroRecebido}
-                      onChange={e => setDinheiroRecebido(parseFloat(e.target.value) || 0)}
+                      placeholder="0,00"
+                      value={dinheiroRecebido || ''}
+                      onFocus={e => e.target.select()}
+                      onChange={e => setDinheiroRecebido(e.target.value === '' ? 0 : parseFloat(e.target.value) || 0)}
                       className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xl font-bold font-mono text-white mt-1"
                     />
                   </div>
@@ -332,8 +335,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onV
                     type="number"
                     step="0.01"
                     max={restante}
-                    value={valorParcela}
-                    onChange={e => setValorParcela(Math.min(restante, parseFloat(e.target.value) || 0))}
+                    value={valorParcela || ''}
+                    onFocus={e => e.target.select()}
+                    onChange={e => setValorParcela(e.target.value === '' ? 0 : Math.min(restante, parseFloat(e.target.value) || 0))}
                     className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xl font-bold font-mono text-white mt-1"
                   />
                 </div>
