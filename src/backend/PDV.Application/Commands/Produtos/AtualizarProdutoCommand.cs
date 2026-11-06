@@ -27,6 +27,11 @@ public class AtualizarProdutoCommandValidator : AbstractValidator<AtualizarProdu
         {
             RuleFor(x => x.PrecoCusto!.Value).GreaterThanOrEqualTo(0).WithMessage("O preço de custo não pode ser negativo.");
         });
+        When(x => x.PrecoCusto.HasValue && x.PrecoVenda.HasValue, () =>
+        {
+            RuleFor(x => x.PrecoCusto!.Value).LessThanOrEqualTo(x => x.PrecoVenda!.Value)
+                .WithMessage("Bloqueio de preço de custo elevado: O preço de custo não pode ser superior ao preço de venda.");
+        });
         When(x => x.EstoqueMinimo.HasValue, () =>
         {
             RuleFor(x => x.EstoqueMinimo!.Value).GreaterThanOrEqualTo(0).WithMessage("O estoque mínimo não pode ser negativo.");

@@ -32,6 +32,12 @@ public class Produto : BaseEntity
         if (precoVenda <= 0)
             throw new DomainException("O preço de venda deve ser maior que zero.");
 
+        if (precoCusto < 0)
+            throw new DomainException("O preço de custo não pode ser negativo.");
+
+        if (precoCusto > precoVenda)
+            throw new DomainException($"Bloqueio de preço de custo elevado: O preço de custo (R$ {precoCusto:N2}) não pode ultrapassar o preço de venda (R$ {precoVenda:N2}).");
+
         CodigoBarras = codigoBarras.Trim();
         Nome = nome.Trim();
         PrecoVenda = precoVenda;
@@ -64,6 +70,12 @@ public class Produto : BaseEntity
         if (precoVenda <= 0)
             throw new DomainException("O preço de venda deve ser maior que zero.");
 
+        if (precoCusto < 0)
+            throw new DomainException("O preço de custo não pode ser negativo.");
+
+        if (precoCusto > precoVenda)
+            throw new DomainException($"Bloqueio de preço de custo elevado: O preço de custo (R$ {precoCusto:N2}) não pode ultrapassar o preço de venda (R$ {precoVenda:N2}).");
+
         PrecoVenda = precoVenda;
         PrecoCusto = precoCusto;
         RegistrarAtualizacao();
@@ -76,6 +88,12 @@ public class Produto : BaseEntity
 
         if (precoVenda <= 0)
             throw new DomainException("O preço de venda deve ser maior que zero.");
+
+        if (precoCusto < 0)
+            throw new DomainException("O preço de custo não pode ser negativo.");
+
+        if (precoCusto > precoVenda)
+            throw new DomainException($"Bloqueio de preço de custo elevado: O preço de custo (R$ {precoCusto:N2}) não pode ultrapassar o preço de venda (R$ {precoVenda:N2}).");
 
         Nome = nome.Trim();
         PrecoVenda = precoVenda;

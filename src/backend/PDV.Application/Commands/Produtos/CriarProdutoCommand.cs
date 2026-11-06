@@ -23,6 +23,7 @@ public class CriarProdutoCommandValidator : AbstractValidator<CriarProdutoComman
         RuleFor(x => x.Nome).NotEmpty().WithMessage("O nome do produto é obrigatório.");
         RuleFor(x => x.PrecoVenda).GreaterThan(0).WithMessage("O preço de venda deve ser maior que zero.");
         RuleFor(x => x.PrecoCusto).GreaterThanOrEqualTo(0).WithMessage("O preço de custo não pode ser negativo.");
+        RuleFor(x => x.PrecoCusto).LessThanOrEqualTo(x => x.PrecoVenda).WithMessage("Bloqueio de preço de custo elevado: O preço de custo não pode ser superior ao preço de venda.");
         RuleFor(x => x.EstoqueMinimo).GreaterThanOrEqualTo(0).WithMessage("O estoque mínimo não pode ser negativo.");
     }
 }

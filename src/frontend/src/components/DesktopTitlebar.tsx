@@ -52,7 +52,7 @@ export const DesktopTitlebar: React.FC = () => {
         <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50" />
         <span className="font-extrabold text-slate-100 tracking-wider">ATYLUS PDV</span>
         <span className="text-[10px] text-emerald-400 bg-emerald-950/60 px-1.5 py-0.2 rounded border border-emerald-900/50">
-          Frente de Caixa
+          Nova Venda
         </span>
         {syncStatus && (
           <span className="text-[10px] text-sky-400 bg-sky-950/60 px-1.5 py-0.2 rounded border border-sky-900/50">

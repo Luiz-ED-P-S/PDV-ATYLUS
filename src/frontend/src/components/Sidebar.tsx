@@ -31,7 +31,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const operador = useAuthStore(state => state.operador);
 
   const menus = [
-    { id: 'pos' as ModuloApp, label: 'Frente de Caixa', icon: ShoppingCart, atalho: 'F1-F4' },
+    { id: 'pos' as ModuloApp, label: 'Nova Venda', icon: ShoppingCart, atalho: 'F1-F4' },
     { id: 'products' as ModuloApp, label: 'Produtos & Estoque', icon: Package, atalho: 'Catálogo' },
     { id: 'sales' as ModuloApp, label: 'Histórico de Vendas', icon: History, atalho: 'Turno' },
     { id: 'cashier' as ModuloApp, label: 'Controle de Caixa', icon: Lock, atalho: 'F3' },
@@ -56,7 +56,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
               <div>
                 <span className="font-extrabold text-sm text-white tracking-wide block">ATYLUS PDV</span>
-                <span className="text-[10px] text-slate-500 font-mono">Frente de Caixa</span>
+                <span className="text-[10px] text-slate-500 font-mono">Nova Venda</span>
               </div>
             </div>
           )}
