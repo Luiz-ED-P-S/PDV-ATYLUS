@@ -11,11 +11,16 @@ public class ImporterController : ControllerBase
 {
     private readonly ISpreadsheetAiService _spreadsheetAiService;
     private readonly IProdutoRepository _produtoRepository;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public ImporterController(ISpreadsheetAiService spreadsheetAiService, IProdutoRepository produtoRepository)
+    public ImporterController(
+        ISpreadsheetAiService spreadsheetAiService,
+        IProdutoRepository produtoRepository,
+        IUnitOfWork unitOfWork)
     {
         _spreadsheetAiService = spreadsheetAiService;
         _produtoRepository = produtoRepository;
+        _unitOfWork = unitOfWork;
     }
 
     [HttpPost("analyze")]
@@ -52,6 +57,18 @@ public class ImporterController : ControllerBase
                     continue;
                 }
 
+                if (item.PrecoVenda <= 0)
+                {
+                    erros.Add($"Erro ao importar '{item.Nome}': O preço de venda deve ser maior que zero.");
+                    continue;
+                }
+
+                if (item.PrecoCusto > item.PrecoVenda)
+                {
+                    erros.Add($"Bloqueio de preço de custo elevado: '{item.Nome}' possui preço de custo (R$ {item.PrecoCusto:N2}) superior ao preço de venda (R$ {item.PrecoVenda:N2}). Operação bloqueada.");
+                    continue;
+                }
+
                 var existente = await _produtoRepository.ObterPorCodigoBarrasAsync(item.CodigoBarras);
                 if (existente != null)
                 {
@@ -76,6 +93,11 @@ public class ImporterController : ControllerBase
             {
                 erros.Add($"Erro ao importar '{item.Nome}': {ex.Message}");
             }
+        }
+
+        if (importados > 0 || atualizados > 0)
+        {
+            await _unitOfWork.CommitAsync();
         }
 
         return Ok(new ConfirmarImportacaoResponse(

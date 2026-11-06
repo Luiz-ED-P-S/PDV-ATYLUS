@@ -26,6 +26,15 @@ export const ProductSearchModal: React.FC<ProductSearchModalProps> = ({ isOpen, 
     }
   }, [isOpen]);
 
+  // Busca em tempo real com debounce
+  useEffect(() => {
+    if (!isOpen) return;
+    const timer = setTimeout(() => {
+      buscar(termo);
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [termo, isOpen]);
+
   const buscar = async (q: string) => {
     setCarregando(true);
     try {
@@ -90,10 +99,7 @@ export const ProductSearchModal: React.FC<ProductSearchModalProps> = ({ isOpen, 
               type="text"
               placeholder="Digite o nome ou código do produto..."
               value={termo}
-              onChange={e => {
-                setTermo(e.target.value);
-                buscar(e.target.value);
-              }}
+              onChange={e => setTermo(e.target.value)}
               className="w-full pl-11 pr-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white font-medium placeholder-slate-500 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 font-mono text-base"
             />
           </div>

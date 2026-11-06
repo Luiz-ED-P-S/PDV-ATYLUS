@@ -27,7 +27,7 @@ public class CloudSyncWorker : BackgroundService
         {
             try
             {
-                using var scope = _serviceProvider.CreateScope();
+                await using var scope = _serviceProvider.CreateAsyncScope();
                 var syncService = scope.ServiceProvider.GetRequiredService<ICloudSyncService>();
 
                 // 1. Sincronização Upstream (PDV -> Nuvem via Outbox)

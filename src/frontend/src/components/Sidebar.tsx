@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   User,
+  LogOut,
 } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 
@@ -30,7 +31,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const operador = useAuthStore(state => state.operador);
 
   const menus = [
-    { id: 'pos' as ModuloApp, label: 'Frente de Caixa', icon: ShoppingCart, atalho: 'F1-F4' },
+    { id: 'pos' as ModuloApp, label: 'Nova Venda', icon: ShoppingCart, atalho: 'F1-F4' },
     { id: 'products' as ModuloApp, label: 'Produtos & Estoque', icon: Package, atalho: 'Catálogo' },
     { id: 'sales' as ModuloApp, label: 'Histórico de Vendas', icon: History, atalho: 'Turno' },
     { id: 'cashier' as ModuloApp, label: 'Controle de Caixa', icon: Lock, atalho: 'F3' },
@@ -55,7 +56,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
               <div>
                 <span className="font-extrabold text-sm text-white tracking-wide block">ATYLUS PDV</span>
-                <span className="text-[10px] text-slate-500 font-mono">Frente de Caixa</span>
+                <span className="text-[10px] text-slate-500 font-mono">Nova Venda</span>
               </div>
             </div>
           )}
@@ -107,20 +108,40 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </nav>
       </div>
 
-      {/* Rodapé da Sidebar: Operador Logado */}
+      {/* Rodapé da Sidebar: Operador Logado e Botão Sair */}
       <div className="p-3 border-t border-[#1a2938] bg-[#090f16]">
         <div className={`flex items-center gap-2.5 ${colapsada ? 'justify-center' : ''}`}>
           <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-sky-600 to-indigo-600 flex items-center justify-center text-white shadow-md shrink-0">
             <User className="w-5 h-5" />
           </div>
 
-          {!colapsada && (
-            <div className="truncate text-xs font-mono">
+          {!colapsada && operador && (
+            <div className="flex-1 truncate text-xs font-mono">
               <span className="text-white font-bold block truncate">{operador.nome}</span>
-              <span className="text-[10px] text-slate-500">{operador.matricula} • {operador.role}</span>
+              <span className="text-[10px] text-slate-500">{operador.matricula} • {operador.perfil}</span>
             </div>
           )}
+
+          {!colapsada && (
+            <button
+              onClick={() => useAuthStore.getState().logout()}
+              title="Bloquear / Trocar Operador"
+              className="p-2 rounded-lg bg-rose-950/40 hover:bg-rose-900/50 text-rose-400 hover:text-rose-300 transition shrink-0"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          )}
         </div>
+
+        {colapsada && (
+          <button
+            onClick={() => useAuthStore.getState().logout()}
+            title="Bloquear / Trocar Operador"
+            className="w-full mt-2 p-2 rounded-lg bg-rose-950/40 hover:bg-rose-900/50 text-rose-400 hover:text-rose-300 transition flex items-center justify-center"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
+        )}
       </div>
     </aside>
   );

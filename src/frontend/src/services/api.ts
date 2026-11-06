@@ -1,12 +1,99 @@
 import axios from 'axios';
-import { Caixa, MovimentacaoCaixa, PixGenerateResult, Produto, ResultadoSincronizacao, StatusSincronizacao, Venda } from '../types';
+import { Caixa, LoginResponse, MovimentacaoCaixa, OperadorListItem, PixGenerateResult, Produto, ResultadoSincronizacao, StatusSincronizacao, Venda } from '../types';
+
+const TOKEN_KEY = 'atylus_pdv_token';
 
 const api = axios.create({
   baseURL: '/api/v1',
   timeout: 5000,
 });
 
+// Interceptor: injeta o token JWT em todas as requisições autenticadas
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Interceptor: se receber 401, limpa o token e redireciona para login
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Não limpa token para rotas de login/operadores (públicas)
+      const url = error.config?.url || '';
+      if (!url.includes('/auth/login') && !url.includes('/auth/operadores')) {
+        localStorage.removeItem(TOKEN_KEY);
+        window.dispatchEvent(new CustomEvent('atylus:session-expired'));
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 export const pdvApi = {
+  // === Autenticação com E-mail, BCrypt e OTP ===
+  async registrarUsuario(nome: string, email: string, senha: string): Promise<{ sucesso: boolean; mensagem: string; usuario?: any }> {
+    const res = await axios.post('/api/auth/register', { nome, email, senha });
+    return res.data;
+  },
+
+  async verificarCodigoOtp(email: string, codigo: string): Promise<{ sucesso: boolean; mensagem: string }> {
+    const res = await axios.post('/api/auth/verify', { email, codigo });
+    return res.data;
+  },
+
+  async loginUsuario(email: string, senha: string): Promise<{ sucesso: boolean; mensagem: string; token?: string; usuario?: any }> {
+    const res = await axios.post('/api/auth/login', { email, senha });
+    if (res.data.token) {
+      localStorage.setItem(TOKEN_KEY, res.data.token);
+    }
+    return res.data;
+  },
+
+  // === Autenticação por Matrícula/PIN (Operador) ===
+  async login(matricula: string, pin: string): Promise<LoginResponse> {
+    const res = await api.post<LoginResponse>('/auth/login', { matricula, pin });
+    localStorage.setItem(TOKEN_KEY, res.data.token);
+    return res.data;
+  },
+
+  async validarSupervisor(pin: string, matricula?: string): Promise<{ valido: boolean; supervisorNome?: string }> {
+    try {
+      const res = await api.post('/auth/validar-supervisor', { pin, matricula });
+      return res.data;
+    } catch {
+      return { valido: false };
+    }
+  },
+
+  async obterOperadorLogado(): Promise<{ id: string; matricula: string; nome: string; perfil: string } | null> {
+    try {
+      const res = await api.get('/auth/me');
+      return res.data;
+    } catch {
+      return null;
+    }
+  },
+
+  async listarOperadores(): Promise<OperadorListItem[]> {
+    try {
+      const res = await api.get<OperadorListItem[]>('/auth/operadores');
+      return res.data;
+    } catch {
+      return [];
+    }
+  },
+
+  logout() {
+    localStorage.removeItem(TOKEN_KEY);
+  },
+
+  getToken(): string | null {
+    return localStorage.getItem(TOKEN_KEY);
+  },
   async buscarProdutos(termo?: string): Promise<Produto[]> {
     const res = await api.get<Produto[]>('/produtos', { params: { termo } });
     return res.data;

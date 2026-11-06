@@ -29,7 +29,7 @@ export const CashierModal: React.FC<CashierModalProps> = ({ isOpen, onClose }) =
   const isAberto = caixa && caixa.status === 'Aberto';
 
   const handleAbrir = async () => {
-    await abrirCaixa(operador.id, saldoInicial);
+    await abrirCaixa(operador?.id ?? 'SISTEMA', saldoInicial);
     setSucessoMsg('Caixa aberto com sucesso com fundo de troco inicial!');
     setTimeout(() => setSucessoMsg(null), 3000);
     setAba('status');
@@ -37,7 +37,7 @@ export const CashierModal: React.FC<CashierModalProps> = ({ isOpen, onClose }) =
 
   const handleExecutarMovimentacao = async (tipo: 'Sangria' | 'Suprimento') => {
     if (valorMov <= 0 || !motivoMov) return;
-    await registrarMovimentacao(tipo, valorMov, motivoMov, operador.id);
+    await registrarMovimentacao(tipo, valorMov, motivoMov, operador?.id ?? 'SISTEMA');
     setSucessoMsg(`${tipo} de R$ ${valorMov.toFixed(2)} registrada e comprovante emitido!`);
     setTimeout(() => setSucessoMsg(null), 3500);
     setMotivoMov('');
@@ -62,7 +62,7 @@ export const CashierModal: React.FC<CashierModalProps> = ({ isOpen, onClose }) =
             <div>
               <h2 className="text-xl font-bold text-white">Central de Caixa (F3) — ATYLUS PDV</h2>
               <p className="text-xs text-slate-400">
-                Status: <strong className={isAberto ? 'text-emerald-400' : 'text-red-400'}>{isAberto ? 'ABERTO' : 'FECHADO'}</strong> • Operador: {operador.nome}
+                Status: <strong className={isAberto ? 'text-emerald-400' : 'text-red-400'}>{isAberto ? 'ABERTO' : 'FECHADO'}</strong> • Operador: {operador?.nome ?? 'N/A'}
               </p>
             </div>
           </div>
@@ -180,8 +180,10 @@ export const CashierModal: React.FC<CashierModalProps> = ({ isOpen, onClose }) =
                   type="number"
                   step="0.01"
                   min="0"
-                  value={saldoInicial}
-                  onChange={e => setSaldoInicial(parseFloat(e.target.value) || 0)}
+                  placeholder="0,00"
+                  value={saldoInicial || ''}
+                  onFocus={e => e.target.select()}
+                  onChange={e => setSaldoInicial(e.target.value === '' ? 0 : parseFloat(e.target.value) || 0)}
                   className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-xl font-bold font-mono text-white focus:outline-none focus:border-emerald-500"
                 />
               </div>
@@ -207,8 +209,10 @@ export const CashierModal: React.FC<CashierModalProps> = ({ isOpen, onClose }) =
                   type="number"
                   step="0.01"
                   min="0"
-                  value={valorMov}
-                  onChange={e => setValorMov(parseFloat(e.target.value) || 0)}
+                  placeholder="0,00"
+                  value={valorMov || ''}
+                  onFocus={e => e.target.select()}
+                  onChange={e => setValorMov(e.target.value === '' ? 0 : parseFloat(e.target.value) || 0)}
                   className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-2xl font-bold font-mono text-amber-400 focus:outline-none focus:border-amber-500"
                 />
               </div>
@@ -247,8 +251,10 @@ export const CashierModal: React.FC<CashierModalProps> = ({ isOpen, onClose }) =
                   type="number"
                   step="0.01"
                   min="0"
-                  value={valorMov}
-                  onChange={e => setValorMov(parseFloat(e.target.value) || 0)}
+                  placeholder="0,00"
+                  value={valorMov || ''}
+                  onFocus={e => e.target.select()}
+                  onChange={e => setValorMov(e.target.value === '' ? 0 : parseFloat(e.target.value) || 0)}
                   className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-2xl font-bold font-mono text-emerald-400 focus:outline-none focus:border-emerald-500"
                 />
               </div>
@@ -291,8 +297,10 @@ export const CashierModal: React.FC<CashierModalProps> = ({ isOpen, onClose }) =
                       type="number"
                       step="0.01"
                       min="0"
-                      value={saldoContado}
-                      onChange={e => setSaldoContado(parseFloat(e.target.value) || 0)}
+                      placeholder="0,00"
+                      value={saldoContado || ''}
+                      onFocus={e => e.target.select()}
+                      onChange={e => setSaldoContado(e.target.value === '' ? 0 : parseFloat(e.target.value) || 0)}
                       className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-2xl font-bold font-mono text-white focus:outline-none focus:border-amber-500"
                     />
                   </div>

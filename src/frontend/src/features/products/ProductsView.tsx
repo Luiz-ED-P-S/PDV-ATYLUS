@@ -19,9 +19,9 @@ export const ProductsView: React.FC = () => {
   const [salvandoNovo, setSalvandoNovo] = useState(false);
   const [novoCodigo, setNovoCodigo] = useState('');
   const [novoNome, setNovoNome] = useState('');
-  const [novoPrecoVenda, setNovoPrecoVenda] = useState<number>(0);
-  const [novoPrecoCusto, setNovoPrecoCusto] = useState<number>(0);
-  const [novoEstoque, setNovoEstoque] = useState<number>(10);
+  const [novoPrecoVenda, setNovoPrecoVenda] = useState<string>('');
+  const [novoPrecoCusto, setNovoPrecoCusto] = useState<string>('');
+  const [novoEstoque, setNovoEstoque] = useState<string>('10');
   const [novaUnidade, setNovaUnidade] = useState<'UN' | 'KG'>('UN');
   const [baixandoNuvem, setBaixandoNuvem] = useState(false);
 
@@ -57,8 +57,17 @@ export const ProductsView: React.FC = () => {
   };
 
   const handleSalvarNovo = async () => {
-    if (!novoCodigo.trim() || !novoNome.trim() || novoPrecoVenda <= 0) {
-      alert('Preencha código, descrição e preço de venda válido.');
+    const precoVendaNum = parseFloat(novoPrecoVenda.replace(',', '.')) || 0;
+    const precoCustoNum = parseFloat(novoPrecoCusto.replace(',', '.')) || 0;
+    const estoqueNum = parseFloat(novoEstoque.replace(',', '.')) || 0;
+
+    if (!novoCodigo.trim() || !novoNome.trim() || precoVendaNum <= 0) {
+      alert('Preencha código, descrição e preço de venda válido (maior que zero).');
+      return;
+    }
+
+    if (precoCustoNum > precoVendaNum) {
+      alert(`Bloqueio de preço de custo elevado: O preço de custo (R$ ${precoCustoNum.toFixed(2)}) não pode ser superior ao preço de venda (R$ ${precoVendaNum.toFixed(2)})! Operação bloqueada.`);
       return;
     }
 
@@ -67,9 +76,9 @@ export const ProductsView: React.FC = () => {
       const novoProduto = await pdvApi.criarProduto({
         codigoBarras: novoCodigo.trim(),
         nome: novoNome.trim(),
-        precoVenda: novoPrecoVenda,
-        precoCusto: novoPrecoCusto,
-        estoqueAtual: novoEstoque,
+        precoVenda: precoVendaNum,
+        precoCusto: precoCustoNum,
+        estoqueAtual: estoqueNum,
         estoqueMinimo: 5,
       });
 
@@ -77,9 +86,9 @@ export const ProductsView: React.FC = () => {
       setIsNovoModalOpen(false);
       setNovoCodigo('');
       setNovoNome('');
-      setNovoPrecoVenda(0);
-      setNovoPrecoCusto(0);
-      setNovoEstoque(10);
+      setNovoPrecoVenda('');
+      setNovoPrecoCusto('');
+      setNovoEstoque('10');
       alert('Produto cadastrado e persistido com sucesso!');
     } catch (err: any) {
       const msg = err.response?.data?.message || err.message || 'Falha ao cadastrar produto.';
@@ -104,6 +113,18 @@ export const ProductsView: React.FC = () => {
     const numVal = parseFloat(editValue);
     if (isNaN(numVal) || (editingCell.field === 'precoVenda' && numVal <= 0) || numVal < 0) {
       alert('Valor inválido fornecido.');
+      cancelInlineEdit();
+      return;
+    }
+
+    if (editingCell.field === 'precoCusto' && numVal > prod.precoVenda) {
+      alert(`Bloqueio de preço de custo elevado: O preço de custo (R$ ${numVal.toFixed(2)}) não pode ser superior ao preço de venda (R$ ${prod.precoVenda.toFixed(2)})! Operação bloqueada.`);
+      cancelInlineEdit();
+      return;
+    }
+
+    if (editingCell.field === 'precoVenda' && numVal < prod.precoCusto) {
+      alert(`Bloqueio de preço de custo elevado: O preço de venda (R$ ${numVal.toFixed(2)}) não pode ser inferior ao preço de custo (R$ ${prod.precoCusto.toFixed(2)})! Operação bloqueada.`);
       cancelInlineEdit();
       return;
     }
@@ -251,6 +272,7 @@ export const ProductsView: React.FC = () => {
                               type="number"
                               step="0.01"
                               autoFocus
+                              onFocus={e => e.target.select()}
                               disabled={salvandoInline}
                               value={editValue}
                               onChange={e => setEditValue(e.target.value)}
@@ -286,6 +308,7 @@ export const ProductsView: React.FC = () => {
                               type="number"
                               step="0.01"
                               autoFocus
+                              onFocus={e => e.target.select()}
                               disabled={salvandoInline}
                               value={editValue}
                               onChange={e => setEditValue(e.target.value)}
@@ -321,6 +344,7 @@ export const ProductsView: React.FC = () => {
                               type="number"
                               step="1"
                               autoFocus
+                              onFocus={e => e.target.select()}
                               disabled={salvandoInline}
                               value={editValue}
                               onChange={e => setEditValue(e.target.value)}
@@ -400,8 +424,11 @@ export const ProductsView: React.FC = () => {
                   <input
                     type="number"
                     step="0.01"
+                    min="0"
+                    placeholder="0,00"
                     value={novoPrecoVenda}
-                    onChange={e => setNovoPrecoVenda(parseFloat(e.target.value) || 0)}
+                    onFocus={e => e.target.select()}
+                    onChange={e => setNovoPrecoVenda(e.target.value)}
                     className="w-full p-2.5 bg-[#090f16] border border-[#1f3042] rounded-xl text-white font-bold text-emerald-400"
                   />
                 </div>
@@ -410,8 +437,11 @@ export const ProductsView: React.FC = () => {
                   <input
                     type="number"
                     step="0.01"
+                    min="0"
+                    placeholder="0,00"
                     value={novoPrecoCusto}
-                    onChange={e => setNovoPrecoCusto(parseFloat(e.target.value) || 0)}
+                    onFocus={e => e.target.select()}
+                    onChange={e => setNovoPrecoCusto(e.target.value)}
                     className="w-full p-2.5 bg-[#090f16] border border-[#1f3042] rounded-xl text-white"
                   />
                 </div>
@@ -422,8 +452,11 @@ export const ProductsView: React.FC = () => {
                   <label className="block text-slate-400 mb-1">ESTOQUE INICIAL:</label>
                   <input
                     type="number"
+                    step="1"
+                    placeholder="0"
                     value={novoEstoque}
-                    onChange={e => setNovoEstoque(parseFloat(e.target.value) || 0)}
+                    onFocus={e => e.target.select()}
+                    onChange={e => setNovoEstoque(e.target.value)}
                     className="w-full p-2.5 bg-[#090f16] border border-[#1f3042] rounded-xl text-white"
                   />
                 </div>

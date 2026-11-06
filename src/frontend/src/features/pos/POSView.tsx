@@ -25,7 +25,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { pdvApi } from '../../services/api';
 import { sound } from '../../services/sound';
 import { decodificarCodigoBarras } from '../../utils/barcodeParser';
-import { Venda } from '../../types';
+import { Venda, Produto } from '../../types';
 
 interface POSViewProps {
   onAbrirImportador: () => void;
@@ -35,6 +35,11 @@ export const POSView: React.FC<POSViewProps> = ({ onAbrirImportador }) => {
   const [codigoInput, setCodigoInput] = useState('');
   const [erroMsg, setErroMsg] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(sound.isMuted());
+
+  // Busca de produtos em tempo real (auto-complete / sugestões dinâmicas)
+  const [sugestoesProdutos, setSugestoesProdutos] = useState<Produto[]>([]);
+  const [sugestaoSelecionadaIdx, setSugestaoSelecionadaIdx] = useState(0);
+  const [mostrarSugestoes, setMostrarSugestoes] = useState(false);
 
   // Modais
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
@@ -189,6 +194,86 @@ export const POSView: React.FC<POSViewProps> = ({ onAbrirImportador }) => {
   }, [isPaymentOpen, isSearchOpen, isCashierOpen, vendaFinalizada, itens, caixa, selectedItemId, removerItemSelecionado, incrementarQuantidade, limparCarrinhoAbaAtual, onAbrirImportador, abaAtivaId, criarNovaAba, fecharAba, alternarPorIndice]);
 
   // Processamento do Código de Barras (Suporta multiplicação '3*cod' e código de balança EAN-13 iniciando com '2')
+  // Busca em tempo real de produtos conforme o usuário digita
+  useEffect(() => {
+    const entrada = codigoInput.trim();
+    if (entrada.length < 2) {
+      setSugestoesProdutos([]);
+      setMostrarSugestoes(false);
+      return;
+    }
+
+    if (/^\d+\*$/.test(entrada)) {
+      return;
+    }
+
+    let termo = entrada;
+    if (entrada.includes('*')) {
+      termo = entrada.split('*').slice(1).join('*').trim();
+    }
+
+    if (termo.length < 2) {
+      setSugestoesProdutos([]);
+      setMostrarSugestoes(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const resultados = await pdvApi.buscarProdutos(termo);
+        setSugestoesProdutos(resultados);
+        setSugestaoSelecionadaIdx(0);
+        setMostrarSugestoes(resultados.length > 0);
+      } catch {
+        setSugestoesProdutos([]);
+      }
+    }, 150);
+
+    return () => clearTimeout(timer);
+  }, [codigoInput]);
+
+  const selecionarSugestao = (produto: Produto) => {
+    let quantidade = 1;
+    const entrada = codigoInput.trim();
+    if (entrada.includes('*')) {
+      const qtdParse = parseFloat(entrada.split('*')[0].replace(',', '.'));
+      if (!isNaN(qtdParse) && qtdParse > 0) {
+        quantidade = qtdParse;
+      }
+    }
+    adicionarProduto(produto, quantidade);
+    setCodigoInput('');
+    setMostrarSugestoes(false);
+    setSugestoesProdutos([]);
+    setErroMsg(null);
+    barcodeInputRef.current?.focus();
+  };
+
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (mostrarSugestoes && sugestoesProdutos.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSugestaoSelecionadaIdx((prev) => (prev < sugestoesProdutos.length - 1 ? prev + 1 : prev));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSugestaoSelecionadaIdx((prev) => (prev > 0 ? prev - 1 : prev));
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setMostrarSugestoes(false);
+        return;
+      }
+      if (e.key === 'Enter' && sugestoesProdutos[sugestaoSelecionadaIdx]) {
+        e.preventDefault();
+        selecionarSugestao(sugestoesProdutos[sugestaoSelecionadaIdx]);
+        return;
+      }
+    }
+  };
+
   const handleCodigoSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErroMsg(null);
@@ -236,15 +321,27 @@ export const POSView: React.FC<POSViewProps> = ({ onAbrirImportador }) => {
       }
     }
 
-    // Busca padrão de produto
+    // Busca padrão de produto por código de barras ou nome
     try {
       const produto = await pdvApi.buscarProdutoPorCodigo(codigo);
       if (produto) {
         adicionarProduto(produto, quantidade);
         setCodigoInput('');
+        setMostrarSugestoes(false);
       } else {
-        sound.playErrorBeep();
-        setErroMsg(`Produto com código '${codigo}' não foi encontrado.`);
+        const encontrados = await pdvApi.buscarProdutos(codigo);
+        if (encontrados.length === 1) {
+          adicionarProduto(encontrados[0], quantidade);
+          setCodigoInput('');
+          setMostrarSugestoes(false);
+        } else if (encontrados.length > 1) {
+          setSugestoesProdutos(encontrados);
+          setSugestaoSelecionadaIdx(0);
+          setMostrarSugestoes(true);
+        } else {
+          sound.playErrorBeep();
+          setErroMsg(`Produto com código ou nome '${codigo}' não foi encontrado.`);
+        }
       }
     } catch {
       sound.playErrorBeep();
@@ -285,7 +382,7 @@ export const POSView: React.FC<POSViewProps> = ({ onAbrirImportador }) => {
         {/* Informações do Operador e Som */}
         <div className="flex items-center gap-4 text-xs font-mono text-slate-400">
           <div>
-            Operador: <strong className="text-slate-200">{operador.nome}</strong> ({operador.matricula})
+            Operador: <strong className="text-slate-200">{operador?.nome ?? 'N/A'}</strong> ({operador?.matricula ?? ''})
           </div>
 
           <button
@@ -366,9 +463,10 @@ export const POSView: React.FC<POSViewProps> = ({ onAbrirImportador }) => {
               <input
                 ref={barcodeInputRef}
                 type="text"
-                placeholder="Passe o leitor, digite código ou 3*código (Balança EAN-13 aceito automaticamente)..."
+                placeholder="Passe o leitor, digite nome ou código (busca em tempo real)..."
                 value={codigoInput}
                 onChange={e => setCodigoInput(e.target.value)}
+                onKeyDown={handleInputKeyDown}
                 className="w-full pl-14 pr-28 py-3.5 bg-slate-900/90 border-2 border-slate-700 rounded-2xl text-xl font-mono font-bold text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 shadow-lg shadow-black/40 tracking-wider"
               />
               <button
@@ -378,6 +476,52 @@ export const POSView: React.FC<POSViewProps> = ({ onAbrirImportador }) => {
                 Enter
               </button>
             </div>
+
+            {/* Dropdown de Busca em Tempo Real */}
+            {mostrarSugestoes && sugestoesProdutos.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900/95 border border-slate-700 rounded-2xl shadow-2xl z-30 overflow-hidden divide-y divide-slate-800/80 backdrop-blur-md animate-in fade-in zoom-in-95 duration-100">
+                <div className="px-4 py-2 bg-slate-800/90 flex items-center justify-between text-xs text-slate-400 font-mono">
+                  <div className="flex items-center gap-1.5 text-sky-400 font-bold">
+                    <Search className="w-3.5 h-3.5" />
+                    <span>Busca em tempo real ({sugestoesProdutos.length} encontrados)</span>
+                  </div>
+                  <span className="text-[11px] text-slate-500">&uarr;&darr; navegar &bull; Enter selecionar &bull; Esc fechar</span>
+                </div>
+                <div className="max-h-64 overflow-y-auto divide-y divide-slate-800/60">
+                  {sugestoesProdutos.map((prod, idx) => {
+                    const isSelected = idx === sugestaoSelecionadaIdx;
+                    return (
+                      <div
+                        key={prod.id}
+                        onMouseDown={() => selecionarSugestao(prod)}
+                        className={`p-3.5 flex items-center justify-between cursor-pointer transition ${
+                          isSelected
+                            ? 'bg-emerald-950/70 border-l-4 border-emerald-500 text-white'
+                            : 'hover:bg-slate-800/50 text-slate-300'
+                        }`}
+                      >
+                        <div>
+                          <div className="font-bold text-sm text-slate-100 flex items-center gap-2">
+                            <span>{prod.nome}</span>
+                            <span className="text-[11px] px-2 py-0.5 rounded bg-slate-800 font-mono text-slate-400">
+                              {prod.codigoBarras}
+                            </span>
+                          </div>
+                          <div className="text-xs text-slate-400 mt-0.5">
+                            Estoque Atual: <strong className="text-slate-300">{prod.estoqueAtual} un</strong>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-base font-bold font-mono text-emerald-400">
+                            R$ {prod.precoVenda.toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {erroMsg && (
               <div className="absolute top-full left-0 right-0 mt-1.5 p-2 bg-red-950/90 border border-red-800/80 rounded-xl text-red-300 text-xs font-mono flex items-center gap-2 z-20 shadow-xl animate-in fade-in">

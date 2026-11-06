@@ -150,3 +150,24 @@ export interface ResultadoSincronizacao {
   mensagem: string;
 }
 
+// === Autenticação e Login ===
+export interface OperadorAuth {
+  id: string;
+  matricula: string;
+  nome: string;
+  perfil: 'Operador' | 'Supervisor';
+}
+
+export interface LoginResponse {
+  token: string;
+  expiraEmHoras: number;
+  operador: OperadorAuth;
+}
+
+export interface OperadorListItem {
+  id: string;
+  matricula: string;
+  nome: string;
+  perfil: string;
+}
+
