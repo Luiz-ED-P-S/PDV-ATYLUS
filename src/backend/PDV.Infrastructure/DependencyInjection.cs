@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using PDV.Application.Interfaces;
 using PDV.Domain.Interfaces;
 using PDV.Infrastructure.Context;
 using PDV.Infrastructure.Repositories;
@@ -55,6 +56,8 @@ public static class DependencyInjection
         services.AddScoped<IGoogleDriveBackupService, GoogleDriveBackupService>();
         services.AddScoped<IThermalPrinterService, ThermalPrinterService>();
         services.AddScoped<ITokenService, TokenService>();
+        services.AddScoped<IEmailService, MailKitEmailService>();
+        services.AddScoped<IAuthService, AuthService>();
         services.AddHttpClient<ISpreadsheetAiService, SpreadsheetAiService>();
         services.AddHttpClient<ICloudSyncService, CloudSyncService>();
 

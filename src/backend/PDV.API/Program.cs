@@ -105,6 +105,46 @@ using (var scope = app.Services.CreateScope())
     try
     {
         context.Database.ExecuteSqlRaw("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA foreign_keys=ON;");
+        
+        // Garante criação da tabela de Usuários (Auth com OTP e BCrypt)
+        try
+        {
+            context.Database.ExecuteSqlRaw(@"
+                CREATE TABLE IF NOT EXISTS Users (
+                    Id TEXT NOT NULL PRIMARY KEY,
+                    Nome TEXT NOT NULL,
+                    Email TEXT NOT NULL,
+                    PasswordHash TEXT NOT NULL,
+                    IsVerified INTEGER NOT NULL DEFAULT 0,
+                    VerificationCode TEXT NULL,
+                    VerificationCodeExpiresAt TEXT NULL,
+                    VerifiedAt TEXT NULL,
+                    CriadoEm TEXT NOT NULL,
+                    AtualizadoEm TEXT NULL
+                );
+                CREATE UNIQUE INDEX IF NOT EXISTS IX_Users_Email ON Users (Email);
+                SELECT CriadoEm FROM Users LIMIT 1;
+            ");
+        }
+        catch
+        {
+            context.Database.ExecuteSqlRaw(@"
+                DROP TABLE IF EXISTS Users;
+                CREATE TABLE Users (
+                    Id TEXT NOT NULL PRIMARY KEY,
+                    Nome TEXT NOT NULL,
+                    Email TEXT NOT NULL,
+                    PasswordHash TEXT NOT NULL,
+                    IsVerified INTEGER NOT NULL DEFAULT 0,
+                    VerificationCode TEXT NULL,
+                    VerificationCodeExpiresAt TEXT NULL,
+                    VerifiedAt TEXT NULL,
+                    CriadoEm TEXT NOT NULL,
+                    AtualizadoEm TEXT NULL
+                );
+                CREATE UNIQUE INDEX IX_Users_Email ON Users (Email);
+            ");
+        }
     }
     catch
     {

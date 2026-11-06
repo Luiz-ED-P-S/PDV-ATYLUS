@@ -16,6 +16,7 @@ public class PdvDbContext : DbContext
     public DbSet<ItemVenda> ItensVenda => Set<ItemVenda>();
     public DbSet<PagamentoVenda> PagamentosVenda => Set<PagamentoVenda>();
     public DbSet<Operador> Operadores => Set<Operador>();
+    public DbSet<User> Users => Set<User>();
     public DbSet<RegistroSincronizacao> FilaSincronizacao => Set<RegistroSincronizacao>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -121,6 +122,17 @@ public class PdvDbContext : DbContext
             entity.Property(o => o.Nome).IsRequired().HasMaxLength(100);
             entity.Property(o => o.Matricula).IsRequired().HasMaxLength(50);
             entity.Property(o => o.Pin).IsRequired().HasMaxLength(100);
+        });
+
+        // Configuração de User (Autenticação com e-mail e OTP)
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.HasKey(u => u.Id);
+            entity.HasIndex(u => u.Email).IsUnique();
+            entity.Property(u => u.Nome).IsRequired().HasMaxLength(100);
+            entity.Property(u => u.Email).IsRequired().HasMaxLength(150);
+            entity.Property(u => u.PasswordHash).IsRequired().HasMaxLength(255);
+            entity.Property(u => u.VerificationCode).HasMaxLength(10);
         });
     }
 }
