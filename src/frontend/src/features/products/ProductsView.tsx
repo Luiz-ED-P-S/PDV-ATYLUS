@@ -62,6 +62,11 @@ export const ProductsView: React.FC = () => {
       return;
     }
 
+    if (novoPrecoCusto > novoPrecoVenda) {
+      alert(`Bloqueio de preço de custo elevado: O preço de custo (R$ ${novoPrecoCusto.toFixed(2)}) não pode ser superior ao preço de venda (R$ ${novoPrecoVenda.toFixed(2)})! Operação bloqueada.`);
+      return;
+    }
+
     setSalvandoNovo(true);
     try {
       const novoProduto = await pdvApi.criarProduto({
@@ -104,6 +109,18 @@ export const ProductsView: React.FC = () => {
     const numVal = parseFloat(editValue);
     if (isNaN(numVal) || (editingCell.field === 'precoVenda' && numVal <= 0) || numVal < 0) {
       alert('Valor inválido fornecido.');
+      cancelInlineEdit();
+      return;
+    }
+
+    if (editingCell.field === 'precoCusto' && numVal > prod.precoVenda) {
+      alert(`Bloqueio de preço de custo elevado: O preço de custo (R$ ${numVal.toFixed(2)}) não pode ser superior ao preço de venda (R$ ${prod.precoVenda.toFixed(2)})! Operação bloqueada.`);
+      cancelInlineEdit();
+      return;
+    }
+
+    if (editingCell.field === 'precoVenda' && numVal < prod.precoCusto) {
+      alert(`Bloqueio de preço de custo elevado: O preço de venda (R$ ${numVal.toFixed(2)}) não pode ser inferior ao preço de custo (R$ ${prod.precoCusto.toFixed(2)})! Operação bloqueada.`);
       cancelInlineEdit();
       return;
     }

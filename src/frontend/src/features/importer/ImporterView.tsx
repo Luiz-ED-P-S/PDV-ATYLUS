@@ -208,7 +208,7 @@ export const ImporterView: React.FC<ImporterViewProps> = ({ onVoltarParaPdv }) =
           onClick={onVoltarParaPdv}
           className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono text-sm rounded-xl transition"
         >
-          Voltar para Frente de Caixa [Esc]
+          Voltar para Nova Venda [Esc]
         </button>
       </div>
 
@@ -323,7 +323,7 @@ export const ImporterView: React.FC<ImporterViewProps> = ({ onVoltarParaPdv }) =
                     onClick={onVoltarParaPdv}
                     className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold"
                   >
-                    Ir para Frente de Caixa
+                    Ir para Nova Venda
                   </button>
                 </div>
               ) : (
