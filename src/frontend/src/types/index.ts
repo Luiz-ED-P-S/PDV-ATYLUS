@@ -150,3 +150,35 @@ export interface ResultadoSincronizacao {
   mensagem: string;
 }
 
+
+// === Clientes e Ordens de Serviço ===
+export type StatusOrdemServico = 'EmAnalise' | 'EmAndamento' | 'AguardandoPecas' | 'Concluida' | 'Entregue' | 'Cancelada';
+
+export interface Cliente {
+  id: string;
+  nome: string;
+  documento: string;
+  telefone: string;
+  email: string;
+  endereco: string;
+  limiteCredito: number;
+  saldoDevedor: number;
+  observacoes?: string;
+  criadoEm: string;
+}
+
+export interface OrdemServico {
+  id: string;
+  numero: number;
+  clienteNome: string;
+  clienteTelefone?: string;
+  equipamentoOuVeiculo: string;
+  descricaoProblema: string;
+  status: StatusOrdemServico;
+  valorMaoDeObra: number;
+  valorPecas: number;
+  valorTotal: number;
+  dataAbertura: string;
+  dataPrevisao?: string;
+  observacoes?: string;
+}
