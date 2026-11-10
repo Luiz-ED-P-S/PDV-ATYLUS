@@ -1,8 +1,12 @@
 import React from 'react';
 import {
+  LayoutDashboard,
   ShoppingCart,
   Package,
   History,
+  Users,
+  Wrench,
+  FileBarChart,
   Lock,
   FileSpreadsheet,
   Settings,
@@ -12,7 +16,17 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 
-export type ModuloApp = 'pos' | 'products' | 'sales' | 'cashier' | 'importer' | 'settings';
+export type ModuloApp = 
+  | 'dashboard'
+  | 'pos' 
+  | 'products' 
+  | 'sales' 
+  | 'customers' 
+  | 'orders' 
+  | 'reports' 
+  | 'cashier' 
+  | 'importer' 
+  | 'settings';
 
 interface SidebarProps {
   moduloAtivo: ModuloApp;
@@ -30,9 +44,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const operador = useAuthStore(state => state.operador);
 
   const menus = [
-    { id: 'pos' as ModuloApp, label: 'Frente de Caixa', icon: ShoppingCart, atalho: 'F1-F4' },
-    { id: 'products' as ModuloApp, label: 'Produtos & Estoque', icon: Package, atalho: 'Catálogo' },
+    { id: 'dashboard' as ModuloApp, label: 'Visão Geral / Início', icon: LayoutDashboard, atalho: 'Home' },
+    { id: 'pos' as ModuloApp, label: 'Nova Venda (PDV)', icon: ShoppingCart, atalho: 'F1' },
+    { id: 'products' as ModuloApp, label: 'Produtos & Estoque', icon: Package, atalho: 'F2' },
+    { id: 'customers' as ModuloApp, label: 'Clientes', icon: Users, atalho: 'CRM' },
+    { id: 'orders' as ModuloApp, label: 'Ordens de Serviço (O.S.)', icon: Wrench, atalho: 'Oficina' },
     { id: 'sales' as ModuloApp, label: 'Histórico de Vendas', icon: History, atalho: 'Turno' },
+    { id: 'reports' as ModuloApp, label: 'Relatórios & DRE', icon: FileBarChart, atalho: 'Finanças' },
     { id: 'cashier' as ModuloApp, label: 'Controle de Caixa', icon: Lock, atalho: 'F3' },
     { id: 'importer' as ModuloApp, label: 'Importador IA & XML', icon: FileSpreadsheet, atalho: 'F4' },
     { id: 'settings' as ModuloApp, label: 'Configurações', icon: Settings, atalho: 'Sistema' },
@@ -50,12 +68,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="p-3 border-b border-[#1a2938] flex items-center justify-between">
           {!colapsada && (
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold font-mono">
+              <div className="w-8 h-8 rounded-xl bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400 font-bold font-mono">
                 A
               </div>
               <div>
                 <span className="font-extrabold text-sm text-white tracking-wide block">ATYLUS PDV</span>
-                <span className="text-[10px] text-slate-500 font-mono">Frente de Caixa</span>
+                <span className="text-[10px] text-slate-500 font-mono">Sistema Comercial</span>
               </div>
             </div>
           )}
@@ -70,7 +88,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Lista de Itens do Menu */}
-        <nav className="p-2 space-y-1">
+        <nav className="p-2 space-y-1 overflow-y-auto max-h-[calc(100vh-140px)] custom-scrollbar">
           {menus.map(item => {
             const isAtivo = moduloAtivo === item.id;
             const Icone = item.icon;
@@ -80,7 +98,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 key={item.id}
                 onClick={() => onSelecionarModulo(item.id)}
                 title={colapsada ? `${item.label} (${item.atalho})` : undefined}
-                className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl font-medium text-xs transition relative group ${
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-xs transition relative group ${
                   isAtivo
                     ? 'bg-sky-600 text-white font-bold shadow-lg shadow-sky-600/30'
                     : 'text-slate-400 hover:bg-[#14212e] hover:text-slate-200'
@@ -89,7 +107,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <Icone className={`w-5 h-5 shrink-0 ${isAtivo ? 'text-white' : 'text-slate-400 group-hover:text-sky-400'}`} />
 
                 {!colapsada && (
-                  <div className="flex-1 flex items-center justify-between truncate">
+                  <div className="flex-1 flex items-center justify-between truncate text-left">
                     <span className="truncate">{item.label}</span>
                     <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${isAtivo ? 'bg-sky-700 text-white' : 'bg-[#14212e] text-slate-500'}`}>
                       {item.atalho}
