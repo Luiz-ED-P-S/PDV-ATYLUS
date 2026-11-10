@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Barcode,
   Search,
   CheckCircle2,
   Lock,
@@ -12,7 +11,6 @@ import {
   RotateCcw,
   Plus,
   X,
-  User,
 } from 'lucide-react';
 import { CartTable } from './components/CartTable';
 import { PaymentModal } from './components/PaymentModal';
@@ -21,7 +19,6 @@ import { ReceiptPrintModal } from './components/ReceiptPrintModal';
 import { CashierModal } from '../cashier/CashierModal';
 import { useCartStore } from '../../store/useCartStore';
 import { useCashierStore } from '../../store/useCashierStore';
-import { useAuthStore } from '../../store/useAuthStore';
 import { pdvApi } from '../../services/api';
 import { sound } from '../../services/sound';
 import { decodificarCodigoBarras } from '../../utils/barcodeParser';
@@ -55,7 +52,6 @@ export const POSView: React.FC<POSViewProps> = ({ onAbrirImportador }) => {
     fecharAba,
     alternarAba,
     alternarPorIndice,
-    getAbaAtiva,
     getItens,
     getTotalBruto,
     getTotalLiquido,
@@ -69,13 +65,11 @@ export const POSView: React.FC<POSViewProps> = ({ onAbrirImportador }) => {
     limparCarrinhoAbaAtual,
   } = useCartStore();
 
-  const abaAtiva = getAbaAtiva();
   const itens = getItens();
   const desconto = getDesconto();
   const selectedItemId = getSelectedItemId();
 
   const { caixa, carregarCaixa } = useCashierStore();
-  const operador = useAuthStore(state => state.operador);
 
   const barcodeInputRef = useRef<HTMLInputElement>(null);
 
@@ -357,162 +351,143 @@ export const POSView: React.FC<POSViewProps> = ({ onAbrirImportador }) => {
   const isCaixaAberto = caixa && caixa.status === 'Aberto';
 
   return (
-    <div className="flex-1 flex flex-col h-screen overflow-hidden bg-slate-950 font-sans">
-      {/* 1. Barra Superior de Status */}
-      <header className="h-14 bg-slate-900 border-b border-slate-800 px-4 flex items-center justify-between select-none">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <span className="w-3.5 h-3.5 rounded-full bg-emerald-500 shadow-md shadow-emerald-500/50" />
-            <span className="font-black text-lg text-white tracking-wider font-mono">ATYLUS PDV</span>
-          </div>
+    <div className="flex-1 flex flex-col space-y-4 select-none font-sans">
+      {/* 1. Barra de Abas e Status Fiel ao Vídeo */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        {/* Abas de Atendimento */}
+        <div className="flex items-center gap-2 overflow-x-auto py-1">
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-1">VENDAS:</span>
+          {abas.map((aba, index) => {
+            const isAtiva = aba.id === abaAtivaId;
+            const totalAba = aba.itens.reduce((acc, i) => acc + i.subtotal, 0);
+
+            return (
+              <div
+                key={aba.id}
+                onClick={() => alternarAba(aba.id)}
+                className={`px-4 py-2 rounded-full text-xs font-bold flex items-center gap-2 cursor-pointer transition shadow-sm ${
+                  isAtiva
+                    ? 'bg-[#005bf8] text-white'
+                    : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200/90'
+                }`}
+              >
+                <span>{index + 1}. {aba.titulo}</span>
+                {totalAba > 0 && (
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono ${isAtiva ? 'bg-blue-700 text-white' : 'bg-slate-100 text-slate-700'}`}>
+                    R$ {totalAba.toFixed(2)}
+                  </span>
+                )}
+                {abas.length > 1 && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      fecharAba(aba.id);
+                    }}
+                    className="hover:text-red-300 rounded p-0.5 ml-1"
+                    title="Fechar aba (Ctrl+W)"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            );
+          })}
 
           <button
-            onClick={() => setIsCashierOpen(true)}
-            className={`px-3 py-1 rounded-full text-xs font-mono font-bold flex items-center gap-1.5 border transition ${
-              isCaixaAberto
-                ? 'bg-emerald-950/60 text-emerald-400 border-emerald-800/80 hover:bg-emerald-900/60'
-                : 'bg-red-950/60 text-red-400 border-red-800/80 hover:bg-red-900/60'
-            }`}
+            onClick={() => criarNovaAba()}
+            title="Abrir nova venda em espera (Ctrl+T)"
+            className="px-3.5 py-2 rounded-full bg-white hover:bg-slate-50 border border-slate-200/90 text-slate-600 hover:text-slate-900 text-xs font-bold flex items-center gap-1.5 shadow-sm transition"
           >
-            {isCaixaAberto ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
-            <span>CAIXA {isCaixaAberto ? 'ABERTO' : 'FECHADO'} (F3)</span>
+            <Plus className="w-3.5 h-3.5 text-[#005bf8]" />
+            <span>+ Nova Venda</span>
           </button>
         </div>
 
-        {/* Informações do Operador e Som */}
-        <div className="flex items-center gap-4 text-xs font-mono text-slate-400">
-          <div>
-            Operador: <strong className="text-slate-200">{operador.nome}</strong> ({operador.matricula})
-          </div>
+        {/* Status do Caixa e Som */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsCashierOpen(true)}
+            className={`px-4 py-2 rounded-full text-xs font-bold flex items-center gap-2 border shadow-sm transition ${
+              isCaixaAberto
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                : 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
+            }`}
+          >
+            {isCaixaAberto ? <Unlock className="w-3.5 h-3.5 text-emerald-600" /> : <Lock className="w-3.5 h-3.5 text-red-500" />}
+            <span>Caixa {isCaixaAberto ? 'Aberto' : 'Fechado'} (F3)</span>
+          </button>
 
           <button
             title={isMuted ? 'Ativar Efeitos Sonoros' : 'Silenciar'}
             onClick={toggleSound}
-            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+            className="p-2 rounded-full bg-white hover:bg-slate-50 text-slate-500 border border-slate-200/90 shadow-sm transition"
           >
-            {isMuted ? <VolumeX className="w-4 h-4 text-red-400" /> : <Volume2 className="w-4 h-4 text-emerald-400" />}
+            {isMuted ? <VolumeX className="w-4 h-4 text-red-500" /> : <Volume2 className="w-4 h-4 text-[#005bf8]" />}
           </button>
         </div>
-      </header>
-
-      {/* 2. BARRA DE MÚLTIPLAS ABAS DE ATENDIMENTO (PDVOpen Multi-Vendas) */}
-      <div className="bg-slate-900/90 border-b border-slate-800 px-3 py-1.5 flex items-center gap-2 overflow-x-auto select-none">
-        <span className="text-[11px] font-mono font-bold text-slate-500 uppercase mr-1">Vendas:</span>
-        {abas.map((aba, index) => {
-          const isAtiva = aba.id === abaAtivaId;
-          const totalAba = aba.itens.reduce((acc, i) => acc + i.subtotal, 0);
-
-          return (
-            <div
-              key={aba.id}
-              onClick={() => alternarAba(aba.id)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold flex items-center gap-2 cursor-pointer transition border ${
-                isAtiva
-                  ? 'bg-emerald-600 text-white border-emerald-500 shadow-md shadow-emerald-950/50'
-                  : 'bg-slate-800/80 text-slate-400 border-slate-700 hover:bg-slate-800 hover:text-slate-200'
-              }`}
-            >
-              <span>{index + 1}. {aba.titulo}</span>
-              {totalAba > 0 && (
-                <span className={`text-[10px] px-1.5 py-0.2 rounded ${isAtiva ? 'bg-emerald-700 text-white' : 'bg-slate-700 text-slate-300'}`}>
-                  R$ {totalAba.toFixed(2)}
-                </span>
-              )}
-              {abas.length > 1 && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    fecharAba(aba.id);
-                  }}
-                  className="hover:text-red-300 rounded p-0.5 ml-0.5"
-                  title="Fechar aba (Ctrl+W)"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              )}
-            </div>
-          );
-        })}
-
-        <button
-          onClick={() => criarNovaAba()}
-          title="Abrir nova venda em espera (Ctrl+T)"
-          className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white text-xs font-mono font-bold flex items-center gap-1 transition"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          <span>Nova Venda</span>
-          <kbd className="text-[10px] text-slate-500 bg-slate-900 px-1 rounded">Ctrl+T</kbd>
-        </button>
-
-        {abaAtiva.clienteNome && (
-          <div className="ml-auto text-xs font-mono text-sky-400 flex items-center gap-1.5 bg-sky-950/60 px-2.5 py-1 rounded-lg border border-sky-800">
-            <User className="w-3.5 h-3.5" />
-            <span>Cliente: <strong>{abaAtiva.clienteNome}</strong></span>
-          </div>
-        )}
       </div>
 
-      {/* 3. Área Principal de Venda (Lado Esquerdo 2/3 e Lado Direito 1/3) */}
-      <div className="flex-1 flex overflow-hidden p-3 gap-3">
-        {/* LADO ESQUERDO (2/3 da Tela): Busca por Código de Barras e Tabela do Carrinho */}
-        <section className="flex-[2] flex flex-col gap-3 min-w-0">
-          {/* Input de Leitor de Código de Barras */}
+      {/* 2. Área Principal de Venda (Lado Esquerdo 2/3 e Lado Direito 1/3) */}
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden gap-4 min-h-0">
+        {/* LADO ESQUERDO: Input de Código de Barras e Tabela do Carrinho */}
+        <section className="flex-[2] flex flex-col gap-4 min-w-0">
+          {/* Input de Leitor de Código de Barras Fiel ao Vídeo */}
           <form onSubmit={handleCodigoSubmit} className="relative">
-            <div className="relative flex items-center">
-              <Barcode className="absolute left-4 w-7 h-7 text-slate-500" />
+            <div className="relative flex items-center bg-white border border-slate-200/90 rounded-full shadow-sm p-1.5">
+              <span className="pl-4 pr-2 text-slate-400 font-mono text-base font-bold select-none tracking-tighter">|||||</span>
               <input
                 ref={barcodeInputRef}
                 type="text"
-                placeholder="Passe o leitor, digite nome ou código (busca em tempo real)..."
+                placeholder="Passe o leitor ou digite o código (ex: 3*código)..."
                 value={codigoInput}
                 onChange={e => setCodigoInput(e.target.value)}
                 onKeyDown={handleInputKeyDown}
-                className="w-full pl-14 pr-28 py-3.5 bg-slate-900/90 border-2 border-slate-700 rounded-2xl text-xl font-mono font-bold text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 shadow-lg shadow-black/40 tracking-wider"
+                className="w-full px-2 py-2 bg-transparent text-slate-800 text-sm font-medium placeholder-slate-400 focus:outline-none"
               />
               <button
                 type="submit"
-                className="absolute right-2 px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-mono font-bold text-sm shadow transition"
+                className="px-6 py-2.5 rounded-full bg-[#005bf8] hover:bg-[#004ce5] text-white font-bold text-xs shadow-sm transition shrink-0"
               >
-                Enter
+                Adicionar
               </button>
             </div>
 
             {/* Dropdown de Busca em Tempo Real */}
             {mostrarSugestoes && sugestoesProdutos.length > 0 && (
-              <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900/95 border border-slate-700 rounded-2xl shadow-2xl z-30 overflow-hidden divide-y divide-slate-800/80 backdrop-blur-md animate-in fade-in zoom-in-95 duration-100">
-                <div className="px-4 py-2 bg-slate-800/90 flex items-center justify-between text-xs text-slate-400 font-mono">
-                  <div className="flex items-center gap-1.5 text-sky-400 font-bold">
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200/90 rounded-3xl shadow-2xl z-30 overflow-hidden divide-y divide-slate-100 backdrop-blur-md animate-in fade-in zoom-in-95 duration-100">
+                <div className="px-5 py-2.5 bg-slate-50/80 flex items-center justify-between text-xs text-slate-500 font-medium">
+                  <div className="flex items-center gap-1.5 text-[#005bf8] font-bold">
                     <Search className="w-3.5 h-3.5" />
                     <span>Busca em tempo real ({sugestoesProdutos.length} encontrados)</span>
                   </div>
-                  <span className="text-[11px] text-slate-500">&uarr;&darr; navegar &bull; Enter selecionar &bull; Esc fechar</span>
+                  <span className="text-[11px] text-slate-400">&uarr;&darr; navegar &bull; Enter selecionar &bull; Esc fechar</span>
                 </div>
-                <div className="max-h-64 overflow-y-auto divide-y divide-slate-800/60">
+                <div className="max-h-64 overflow-y-auto divide-y divide-slate-100">
                   {sugestoesProdutos.map((prod, idx) => {
                     const isSelected = idx === sugestaoSelecionadaIdx;
                     return (
                       <div
                         key={prod.id}
                         onMouseDown={() => selecionarSugestao(prod)}
-                        className={`p-3.5 flex items-center justify-between cursor-pointer transition ${
+                        className={`p-3.5 px-5 flex items-center justify-between cursor-pointer transition ${
                           isSelected
-                            ? 'bg-emerald-950/70 border-l-4 border-emerald-500 text-white'
-                            : 'hover:bg-slate-800/50 text-slate-300'
+                            ? 'bg-blue-50/70 border-l-4 border-[#005bf8]'
+                            : 'hover:bg-slate-50/70 text-slate-700'
                         }`}
                       >
                         <div>
-                          <div className="font-bold text-sm text-slate-100 flex items-center gap-2">
+                          <div className="font-bold text-sm text-slate-900 flex items-center gap-2">
                             <span>{prod.nome}</span>
-                            <span className="text-[11px] px-2 py-0.5 rounded bg-slate-800 font-mono text-slate-400">
+                            <span className="text-[11px] px-2 py-0.5 rounded-md bg-slate-100 font-mono text-slate-500 font-semibold">
                               {prod.codigoBarras}
                             </span>
                           </div>
-                          <div className="text-xs text-slate-400 mt-0.5">
-                            Estoque Atual: <strong className="text-slate-300">{prod.estoqueAtual} un</strong>
+                          <div className="text-xs text-slate-500 mt-0.5 font-medium">
+                            Estoque: <strong className="text-slate-700">{prod.estoqueAtual} un</strong>
                           </div>
                         </div>
                         <div className="text-right">
-                          <span className="text-base font-bold font-mono text-emerald-400">
+                          <span className="text-base font-extrabold font-mono text-emerald-600">
                             R$ {prod.precoVenda.toFixed(2)}
                           </span>
                         </div>
@@ -524,111 +499,115 @@ export const POSView: React.FC<POSViewProps> = ({ onAbrirImportador }) => {
             )}
 
             {erroMsg && (
-              <div className="absolute top-full left-0 right-0 mt-1.5 p-2 bg-red-950/90 border border-red-800/80 rounded-xl text-red-300 text-xs font-mono flex items-center gap-2 z-20 shadow-xl animate-in fade-in">
-                <AlertTriangle className="w-4 h-4 shrink-0 text-red-400" />
+              <div className="absolute top-full left-0 right-0 mt-2 p-3 bg-red-50 border border-red-200 rounded-2xl text-red-600 text-xs font-medium flex items-center gap-2 z-20 shadow-md">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-red-500" />
                 <span>{erroMsg}</span>
               </div>
             )}
           </form>
 
-          {/* Tabela de Produtos no Carrinho */}
+          {/* Tabela do Carrinho */}
           <CartTable />
         </section>
 
-        {/* LADO DIREITO (1/3 da Tela): Painel Financeiro Digital e Botões de Atalho */}
-        <aside className="flex-1 flex flex-col gap-3 min-w-[320px] max-w-[420px]">
-          {/* Display Digital do Caixa */}
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-2xl flex flex-col justify-between">
-            <div className="space-y-3 font-mono">
-              <div className="flex justify-between items-center text-sm text-slate-400">
-                <span>SUBTOTAL:</span>
-                <span className="font-bold text-slate-200">R$ {getTotalBruto().toFixed(2)}</span>
+        {/* LADO DIREITO: Totalizador e Botões Fiel ao Vídeo */}
+        <aside className="w-full lg:w-96 flex flex-col gap-4 shrink-0">
+          {/* Card Branco de Resumo de Valores */}
+          <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-sm flex flex-col justify-between">
+            <div className="space-y-3.5 text-xs font-semibold">
+              <div className="flex justify-between items-center text-slate-500">
+                <span>Subtotal Bruto:</span>
+                <span className="font-mono text-slate-900 font-bold text-sm">R$ {getTotalBruto().toFixed(2)}</span>
               </div>
 
-              <div className="flex justify-between items-center text-sm text-slate-400">
-                <span>DESCONTO:</span>
+              <div className="flex justify-between items-center text-slate-500">
+                <span>Desconto:</span>
                 <div className="flex items-center gap-2">
-                  <span className="text-red-400 font-bold">- R$ {desconto.toFixed(2)}</span>
+                  <span className="font-mono text-red-500 font-bold">- R$ {desconto.toFixed(2)}</span>
                   <button
                     onClick={() => {
                       const desc = prompt('Informe o valor de desconto (R$):', String(desconto));
                       if (desc !== null) setDesconto(parseFloat(desc) || 0);
                     }}
-                    className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 hover:text-white"
+                    className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 font-bold transition"
                   >
                     Editar
                   </button>
                 </div>
               </div>
 
-              <div className="flex justify-between items-center text-xs text-slate-500 border-t border-slate-800 pt-2">
-                <span>TOTAL DE ITENS:</span>
-                <span className="font-bold text-slate-400">{getTotalItens()}</span>
+              <div className="flex justify-between items-center text-slate-400 border-t border-slate-100 pt-3 text-[11px]">
+                <span>Total de Itens:</span>
+                <span className="font-bold text-slate-700">{getTotalItens()}</span>
               </div>
             </div>
 
-            {/* Total Líquido em Destaque Gigante */}
-            <div className="mt-4 pt-4 border-t-2 border-dashed border-slate-800 text-right">
-              <span className="text-xs text-emerald-400 font-mono tracking-widest font-bold uppercase block mb-1">
-                VALOR TOTAL LÍQUIDO ({abaAtiva.titulo})
+            {/* Total a Pagar em Destaque Azul Fiel ao Vídeo */}
+            <div className="mt-6 pt-5 border-t border-slate-100 text-right">
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest block mb-1">
+                TOTAL A PAGAR
               </span>
-              <div className="text-4xl lg:text-5xl font-black font-mono text-emerald-400 tracking-tight drop-shadow-[0_2px_10px_rgba(16,185,129,0.3)]">
+              <div className="text-4xl lg:text-5xl font-black font-mono text-[#005bf8] tracking-tight">
                 R$ {getTotalLiquido().toFixed(2)}
               </div>
             </div>
           </div>
 
-          {/* Painel de Ações Rápidas por Teclado */}
-          <div className="flex-1 bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between gap-2.5">
-            <div className="space-y-2">
-              <button
-                onClick={() => {
-                  if (itens.length > 0 && isCaixaAberto) setIsPaymentOpen(true);
-                  else if (!isCaixaAberto) setErroMsg('Abra o caixa primeiro [F3].');
-                }}
-                disabled={itens.length === 0}
-                className="w-full py-4 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-slate-950 font-black text-lg flex items-center justify-between shadow-lg shadow-emerald-500/20 active:scale-98 transition"
-              >
-                <div className="flex items-center gap-2.5">
-                  <CheckCircle2 className="w-6 h-6" />
-                  <span>FINALIZAR VENDA</span>
-                </div>
-                <kbd className="px-2 py-1 rounded bg-emerald-600/60 text-slate-950 font-mono text-xs">F1</kbd>
-              </button>
+          {/* Botões de Ação Fiel ao Vídeo */}
+          <div className="bg-white border border-slate-200/90 rounded-3xl p-5 shadow-sm flex flex-col gap-3">
+            <button
+              onClick={() => {
+                if (itens.length > 0 && isCaixaAberto) setIsPaymentOpen(true);
+                else if (!isCaixaAberto) setErroMsg('Abra o caixa primeiro [F3].');
+              }}
+              disabled={itens.length === 0}
+              className={`w-full py-4 px-5 rounded-2xl font-black text-base flex items-center justify-between transition ${
+                itens.length > 0
+                  ? 'bg-[#005bf8] hover:bg-[#004ce5] text-white shadow-md shadow-blue-500/20 active:scale-98'
+                  : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <CheckCircle2 className="w-5 h-5" />
+                <span>FINALIZAR VENDA</span>
+              </div>
+              <span className={`px-2 py-0.5 rounded-lg text-xs font-mono font-bold ${itens.length > 0 ? 'bg-blue-700 text-white' : 'bg-slate-200 text-slate-400'}`}>
+                F1
+              </span>
+            </button>
 
-              <button
-                onClick={() => setIsSearchOpen(true)}
-                className="w-full py-3 px-4 rounded-xl bg-sky-950/60 hover:bg-sky-900/70 border border-sky-800/60 text-sky-200 font-bold text-sm flex items-center justify-between active:scale-98 transition"
-              >
-                <div className="flex items-center gap-2">
-                  <Search className="w-4 h-4 text-sky-400" />
-                  <span>BUSCAR PRODUTO</span>
-                </div>
-                <kbd className="px-2 py-0.5 rounded bg-sky-900 text-sky-300 font-mono text-xs">F2</kbd>
-              </button>
+            <button
+              onClick={() => setIsSearchOpen(true)}
+              className="w-full py-3 px-5 rounded-2xl bg-white hover:bg-slate-50 border border-slate-200/90 text-slate-700 font-bold text-xs flex items-center justify-between shadow-sm active:scale-98 transition"
+            >
+              <div className="flex items-center gap-2.5">
+                <Search className="w-4 h-4 text-slate-400" />
+                <span className="uppercase">BUSCAR PRODUTO</span>
+              </div>
+              <span className="px-2 py-0.5 rounded-lg bg-slate-100 text-slate-500 font-mono text-xs">F2</span>
+            </button>
 
-              <button
-                onClick={() => setIsCashierOpen(true)}
-                className="w-full py-3 px-4 rounded-xl bg-amber-950/60 hover:bg-amber-900/70 border border-amber-800/60 text-amber-200 font-bold text-sm flex items-center justify-between active:scale-98 transition"
-              >
-                <div className="flex items-center gap-2">
-                  <Lock className="w-4 h-4 text-amber-400" />
-                  <span>CONTROLE DE CAIXA</span>
-                </div>
-                <kbd className="px-2 py-0.5 rounded bg-amber-900 text-amber-300 font-mono text-xs">F3</kbd>
-              </button>
+            <button
+              onClick={() => setIsCashierOpen(true)}
+              className="w-full py-3 px-5 rounded-2xl bg-white hover:bg-slate-50 border border-slate-200/90 text-slate-700 font-bold text-xs flex items-center justify-between shadow-sm active:scale-98 transition"
+            >
+              <div className="flex items-center gap-2.5">
+                <Lock className="w-4 h-4 text-slate-400" />
+                <span className="uppercase">CONTROLE DE CAIXA</span>
+              </div>
+              <span className="px-2 py-0.5 rounded-lg bg-slate-100 text-slate-500 font-mono text-xs">F3</span>
+            </button>
 
-              <button
-                onClick={onAbrirImportador}
-                className="w-full py-3 px-4 rounded-xl bg-indigo-950/60 hover:bg-indigo-900/70 border border-indigo-800/60 text-indigo-200 font-bold text-sm flex items-center justify-between active:scale-98 transition"
-              >
-                <div className="flex items-center gap-2">
-                  <FileSpreadsheet className="w-4 h-4 text-indigo-400" />
-                  <span>IMPORTAÇÃO IA & XML</span>
-                </div>
-                <kbd className="px-2 py-0.5 rounded bg-indigo-900 text-indigo-300 font-mono text-xs">F4</kbd>
-              </button>
-            </div>
+            <button
+              onClick={onAbrirImportador}
+              className="w-full py-3 px-5 rounded-2xl bg-white hover:bg-slate-50 border border-slate-200/90 text-slate-700 font-bold text-xs flex items-center justify-between shadow-sm active:scale-98 transition"
+            >
+              <div className="flex items-center gap-2.5">
+                <FileSpreadsheet className="w-4 h-4 text-slate-400" />
+                <span className="uppercase">IMPORTAÇÃO IA & XML</span>
+              </div>
+              <span className="px-2 py-0.5 rounded-lg bg-slate-100 text-slate-500 font-mono text-xs">F4</span>
+            </button>
 
             <button
               onClick={() => {
@@ -636,13 +615,13 @@ export const POSView: React.FC<POSViewProps> = ({ onAbrirImportador }) => {
                   limparCarrinhoAbaAtual();
                 }
               }}
-              className="w-full py-2.5 px-3 rounded-xl bg-slate-800/60 hover:bg-red-950/50 hover:text-red-400 border border-slate-700/60 text-slate-400 text-xs font-mono font-bold flex items-center justify-between transition"
+              className="w-full py-2.5 px-4 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 text-xs font-bold flex items-center justify-between transition mt-1"
             >
               <div className="flex items-center gap-2">
                 <RotateCcw className="w-3.5 h-3.5" />
                 <span>LIMPAR CARRINHO</span>
               </div>
-              <kbd className="px-1.5 py-0.5 rounded bg-slate-700 text-slate-300 font-mono text-[10px]">Esc</kbd>
+              <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-400 font-mono text-[10px]">Esc</span>
             </button>
           </div>
         </aside>
