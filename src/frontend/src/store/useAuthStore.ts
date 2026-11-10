@@ -25,7 +25,7 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>((set) => ({
   operador: operadorPadrao,
-  autenticado: true,
+  autenticado: false,
 
   login: async (emailOuMatricula, _senhaOuPin) => {
     set({

@@ -2,30 +2,27 @@ import React from 'react';
 import {
   LayoutDashboard,
   ShoppingCart,
-  Package,
+  Lock,
   History,
-  Users,
   Wrench,
   FileBarChart,
-  Lock,
-  FileSpreadsheet,
-  Settings,
+  Users,
+  Package,
   ChevronLeft,
   ChevronRight,
-  User,
+  Sparkles,
 } from 'lucide-react';
-import { useAuthStore } from '../store/useAuthStore';
 
-export type ModuloApp = 
+export type ModuloApp =
   | 'dashboard'
-  | 'pos' 
-  | 'products' 
-  | 'sales' 
-  | 'customers' 
-  | 'orders' 
-  | 'reports' 
-  | 'cashier' 
-  | 'importer' 
+  | 'pos'
+  | 'cashier'
+  | 'sales'
+  | 'orders'
+  | 'reports'
+  | 'customers'
+  | 'products'
+  | 'importer'
   | 'settings';
 
 interface SidebarProps {
@@ -41,104 +38,164 @@ export const Sidebar: React.FC<SidebarProps> = ({
   colapsada,
   onToggleColapso,
 }) => {
-  const operador = useAuthStore(state => state.operador);
+  const menusPrincipais = [
+    { id: 'dashboard' as ModuloApp, label: 'Painel', icon: LayoutDashboard },
+    { id: 'pos' as ModuloApp, label: 'Nova Venda', icon: ShoppingCart },
+    { id: 'cashier' as ModuloApp, label: 'Caixa', icon: Lock },
+    { id: 'sales' as ModuloApp, label: 'Vendas', icon: History },
+    { id: 'orders' as ModuloApp, label: 'Ordens de Serviço', icon: Wrench },
+    { id: 'reports' as ModuloApp, label: 'Relatórios', icon: FileBarChart },
+  ];
 
-  const menus = [
-    { id: 'dashboard' as ModuloApp, label: 'Visão Geral / Início', icon: LayoutDashboard, atalho: 'Home' },
-    { id: 'pos' as ModuloApp, label: 'Nova Venda', icon: ShoppingCart, atalho: 'F1' },
-    { id: 'products' as ModuloApp, label: 'Produtos & Estoque', icon: Package, atalho: 'F2' },
-    { id: 'customers' as ModuloApp, label: 'Clientes', icon: Users, atalho: 'CRM' },
-    { id: 'orders' as ModuloApp, label: 'Ordens de Serviço (O.S.)', icon: Wrench, atalho: 'Oficina' },
-    { id: 'sales' as ModuloApp, label: 'Histórico de Vendas', icon: History, atalho: 'Turno' },
-    { id: 'reports' as ModuloApp, label: 'Relatórios & DRE', icon: FileBarChart, atalho: 'Finanças' },
-    { id: 'cashier' as ModuloApp, label: 'Controle de Caixa', icon: Lock, atalho: 'F3' },
-    { id: 'importer' as ModuloApp, label: 'Importador IA & XML', icon: FileSpreadsheet, atalho: 'F4' },
-    { id: 'settings' as ModuloApp, label: 'Configurações', icon: Settings, atalho: 'Sistema' },
+  const menusLoja = [
+    { id: 'customers' as ModuloApp, label: 'Clientes', icon: Users },
+    { id: 'products' as ModuloApp, label: 'Produtos', icon: Package },
   ];
 
   return (
     <aside
-      className={`bg-[#0c141d] border-r border-[#1a2938] flex flex-col justify-between transition-all duration-200 select-none z-40 ${
-        colapsada ? 'w-16' : 'w-64'
+      className={`bg-white border-r border-slate-200/90 flex flex-col justify-between transition-all duration-300 select-none z-30 shadow-sm ${
+        colapsada ? 'w-20' : 'w-64'
       }`}
     >
-      {/* Topo da Sidebar: Navegação Principal */}
+      {/* Topo: Logo Oficial e Menus */}
       <div className="flex flex-col">
-        {/* Botão de Colapso do Menu */}
-        <div className="p-3 border-b border-[#1a2938] flex items-center justify-between">
-          {!colapsada && (
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400 font-bold font-mono">
-                A
+        {/* Logo Atylus PDV */}
+        <div className="p-5 flex items-center justify-between border-b border-slate-100/80">
+          {!colapsada ? (
+            <div className="flex items-center gap-3">
+              {/* Ícone de Carrinho Azul Royal com Linhas de Movimento */}
+              <div className="w-10 h-10 rounded-2xl bg-blue-50 text-[#005bf8] flex items-center justify-center shrink-0 shadow-sm border border-blue-100/60">
+                <svg className="w-6 h-6 fill-current" viewBox="0 0 48 48">
+                  <path d="M4 14h10v3H4zm-2 7h12v3H2zm4 7h8v3H6z" opacity="0.9" />
+                  <path d="M16 11h24l-3.5 14.5H20.5L16 11zm1.5-3.5H12l-1 4H4v3h5.5l5 20h23v-3.5H18.2l-.9-3.5h18.2a2 2 0 001.95-1.55l3.8-15.5a2 2 0 00-1.95-2.45H17.5z" />
+                  <circle cx="21" cy="38" r="3.5" />
+                  <circle cx="35" cy="38" r="3.5" />
+                </svg>
               </div>
-              <div>
-                <span className="font-extrabold text-sm text-white tracking-wide block">ATYLUS PDV</span>
-                <span className="text-[10px] text-slate-500 font-mono">Nova Venda</span>
+              <div className="leading-none">
+                <span className="font-extrabold text-base tracking-tight text-slate-900 block">
+                  PDV <span className="text-[#005bf8]">ATYLUS</span>
+                </span>
+                <span className="text-[10px] font-semibold text-slate-400 tracking-wider flex items-center gap-1 mt-0.5 uppercase">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  OPEN
+                </span>
               </div>
+            </div>
+          ) : (
+            <div className="w-10 h-10 rounded-2xl bg-blue-50 text-[#005bf8] flex items-center justify-center mx-auto shadow-sm">
+              <ShoppingCart className="w-5 h-5" />
             </div>
           )}
 
           <button
             onClick={onToggleColapso}
-            title={colapsada ? 'Expandir Menu (Ctrl+B)' : 'Recolher Menu (Ctrl+B)'}
-            className={`p-1.5 rounded-lg bg-[#14212e] hover:bg-[#1a2b3c] text-slate-400 hover:text-white transition ${colapsada ? 'mx-auto' : ''}`}
+            className="hidden lg:flex p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition"
+            title={colapsada ? 'Expandir Menu' : 'Recolher Menu'}
           >
             {colapsada ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
           </button>
         </div>
 
-        {/* Lista de Itens do Menu */}
-        <nav className="p-2 space-y-1 overflow-y-auto max-h-[calc(100vh-140px)] custom-scrollbar">
-          {menus.map(item => {
-            const isAtivo = moduloAtivo === item.id;
-            const Icone = item.icon;
+        {/* Grupo 1: MENU */}
+        <div className="px-3 pt-4">
+          {!colapsada && (
+            <span className="px-3 text-[11px] font-bold tracking-wider text-slate-400 uppercase block mb-2">
+              Menu
+            </span>
+          )}
+          <nav className="space-y-1">
+            {menusPrincipais.map((item) => {
+              const isAtivo = moduloAtivo === item.id;
+              const Icone = item.icon;
 
-            return (
-              <button
-                key={item.id}
-                onClick={() => onSelecionarModulo(item.id)}
-                title={colapsada ? `${item.label} (${item.atalho})` : undefined}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-xs transition relative group ${
-                  isAtivo
-                    ? 'bg-sky-600 text-white font-bold shadow-lg shadow-sky-600/30'
-                    : 'text-slate-400 hover:bg-[#14212e] hover:text-slate-200'
-                }`}
-              >
-                <Icone className={`w-5 h-5 shrink-0 ${isAtivo ? 'text-white' : 'text-slate-400 group-hover:text-sky-400'}`} />
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => onSelecionarModulo(item.id)}
+                  title={colapsada ? item.label : undefined}
+                  className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl text-xs sm:text-sm font-semibold transition-all relative ${
+                    isAtivo
+                      ? 'bg-blue-50 text-[#005bf8] font-bold shadow-sm'
+                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                  } ${colapsada ? 'justify-center px-0' : ''}`}
+                >
+                  <Icone
+                    className={`w-5 h-5 shrink-0 ${
+                      isAtivo ? 'text-[#005bf8]' : 'text-slate-500'
+                    }`}
+                  />
+                  {!colapsada && <span>{item.label}</span>}
+                  {isAtivo && !colapsada && (
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-[#005bf8] rounded-r-full" />
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+        </div>
 
-                {!colapsada && (
-                  <div className="flex-1 flex items-center justify-between truncate text-left">
-                    <span className="truncate">{item.label}</span>
-                    <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${isAtivo ? 'bg-sky-700 text-white' : 'bg-[#14212e] text-slate-500'}`}>
-                      {item.atalho}
-                    </span>
-                  </div>
-                )}
+        {/* Grupo 2: LOJA */}
+        <div className="px-3 pt-6">
+          {!colapsada && (
+            <span className="px-3 text-[11px] font-bold tracking-wider text-slate-400 uppercase block mb-2">
+              Loja
+            </span>
+          )}
+          <nav className="space-y-1">
+            {menusLoja.map((item) => {
+              const isAtivo = moduloAtivo === item.id;
+              const Icone = item.icon;
 
-                {/* Marcador lateral ativo */}
-                {isAtivo && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-white rounded-r-full" />
-                )}
-              </button>
-            );
-          })}
-        </nav>
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => onSelecionarModulo(item.id)}
+                  title={colapsada ? item.label : undefined}
+                  className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl text-xs sm:text-sm font-semibold transition-all relative ${
+                    isAtivo
+                      ? 'bg-blue-50 text-[#005bf8] font-bold shadow-sm'
+                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                  } ${colapsada ? 'justify-center px-0' : ''}`}
+                >
+                  <Icone
+                    className={`w-5 h-5 shrink-0 ${
+                      isAtivo ? 'text-[#005bf8]' : 'text-slate-500'
+                    }`}
+                  />
+                  {!colapsada && <span>{item.label}</span>}
+                  {isAtivo && !colapsada && (
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-[#005bf8] rounded-r-full" />
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+        </div>
       </div>
 
-      {/* Rodapé da Sidebar: Operador Logado */}
-      <div className="p-3 border-t border-[#1a2938] bg-[#090f16]">
-        <div className={`flex items-center gap-2.5 ${colapsada ? 'justify-center' : ''}`}>
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-sky-600 to-indigo-600 flex items-center justify-center text-white shadow-md shrink-0">
-            <User className="w-5 h-5" />
-          </div>
-
-          {!colapsada && (
-            <div className="truncate text-xs font-mono">
-              <span className="text-white font-bold block truncate">{operador.nome}</span>
-              <span className="text-[10px] text-slate-500">{operador.matricula} • {operador.role}</span>
+      {/* Rodapé da Sidebar: Card Gradiente Azul Escuro com Estrelas */}
+      <div className="p-3">
+        {!colapsada ? (
+          <div className="relative overflow-hidden bg-gradient-to-br from-[#0c1833] via-[#0b1736] to-[#071026] text-white rounded-3xl p-4 shadow-lg border border-slate-800/40">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-7 h-7 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-blue-400">
+                <Sparkles className="w-4 h-4" />
+              </div>
+              <span className="text-xs font-bold text-white tracking-tight">
+                Nova versão disponível
+              </span>
             </div>
-          )}
-        </div>
+            <p className="text-[11px] text-slate-300/90 leading-tight">
+              Obtenha as melhores funcionalidades.
+            </p>
+          </div>
+        ) : (
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#0c1833] to-[#071026] text-blue-400 flex items-center justify-center mx-auto shadow-md">
+            <Sparkles className="w-5 h-5" />
+          </div>
+        )}
       </div>
     </aside>
   );
