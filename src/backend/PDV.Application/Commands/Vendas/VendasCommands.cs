@@ -99,6 +99,11 @@ public class CriarVendaCommandHandler : IRequestHandler<CriarVendaCommand, Venda
                 if (produto == null)
                     throw new DomainException($"Produto de ID '{itemInput.ProdutoId}' não foi localizado no catálogo.");
 
+                if (produto.PrecoCusto > 0 && itemInput.PrecoUnitario < produto.PrecoCusto)
+                {
+                    throw new DomainException($"Bloqueio de preço de custo elevado: O item '{produto.Nome}' possui preço de custo de R$ {produto.PrecoCusto:N2}, não podendo ser vendido por R$ {itemInput.PrecoUnitario:N2} (preço de venda abaixo do custo). Operação bloqueada.");
+                }
+
                 produto.DebitarEstoque(itemInput.Quantidade);
                 await _produtoRepository.AtualizarAsync(produto, cancellationToken);
 

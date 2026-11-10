@@ -45,7 +45,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const menus = [
     { id: 'dashboard' as ModuloApp, label: 'Visão Geral / Início', icon: LayoutDashboard, atalho: 'Home' },
-    { id: 'pos' as ModuloApp, label: 'Nova Venda (PDV)', icon: ShoppingCart, atalho: 'F1' },
+    { id: 'pos' as ModuloApp, label: 'Nova Venda', icon: ShoppingCart, atalho: 'F1' },
     { id: 'products' as ModuloApp, label: 'Produtos & Estoque', icon: Package, atalho: 'F2' },
     { id: 'customers' as ModuloApp, label: 'Clientes', icon: Users, atalho: 'CRM' },
     { id: 'orders' as ModuloApp, label: 'Ordens de Serviço (O.S.)', icon: Wrench, atalho: 'Oficina' },
@@ -73,7 +73,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
               <div>
                 <span className="font-extrabold text-sm text-white tracking-wide block">ATYLUS PDV</span>
-                <span className="text-[10px] text-slate-500 font-mono">Sistema Comercial</span>
+                <span className="text-[10px] text-slate-500 font-mono">Nova Venda</span>
               </div>
             </div>
           )}

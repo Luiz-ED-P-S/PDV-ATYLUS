@@ -4,7 +4,7 @@ using PDV.Infrastructure.Context;
 
 namespace PDV.Infrastructure.Repositories;
 
-public class UnitOfWork : IUnitOfWork, IAsyncDisposable
+public class UnitOfWork : IUnitOfWork, IDisposable, IAsyncDisposable
 {
     private readonly PdvDbContext _context;
     private IDbContextTransaction? _currentTransaction;
@@ -63,6 +63,15 @@ public class UnitOfWork : IUnitOfWork, IAsyncDisposable
                 await _currentTransaction.DisposeAsync();
                 _currentTransaction = null;
             }
+        }
+    }
+
+    public void Dispose()
+    {
+        if (_currentTransaction != null)
+        {
+            _currentTransaction.Dispose();
+            _currentTransaction = null;
         }
     }
 
