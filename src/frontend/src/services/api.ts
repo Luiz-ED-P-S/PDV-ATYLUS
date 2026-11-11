@@ -56,8 +56,17 @@ export const pdvApi = {
 
   async obterCaixaAtual(): Promise<Caixa | null> {
     try {
-      const res = await api.get<Caixa>('/caixa/atual');
-      return res.data;
+      const res = await api.get<any>('/caixa/atual');
+      if (!res.data) return null;
+      const c = res.data;
+      return {
+        ...c,
+        status: (c.status === 1 || c.status === 'Aberto') ? 'Aberto' : 'Fechado',
+        movimentacoes: (c.movimentacoes || []).map((m: any) => ({
+          ...m,
+          tipo: (m.tipo === 1 || m.tipo === 'Suprimento') ? 'Suprimento' : 'Sangria',
+        })),
+      };
     } catch (err: any) {
       if (err.response?.status === 404) return null;
       throw err;
@@ -65,8 +74,16 @@ export const pdvApi = {
   },
 
   async abrirCaixa(operadorId: string, saldoInicial: number): Promise<Caixa> {
-    const res = await api.post<Caixa>('/caixa/abrir', { operadorId, saldoInicial });
-    return res.data;
+    const res = await api.post<any>('/caixa/abrir', { operadorId, saldoInicial });
+    const c = res.data;
+    return {
+      ...c,
+      status: (c.status === 1 || c.status === 'Aberto') ? 'Aberto' : 'Fechado',
+      movimentacoes: (c.movimentacoes || []).map((m: any) => ({
+        ...m,
+        tipo: (m.tipo === 1 || m.tipo === 'Suprimento') ? 'Suprimento' : 'Sangria',
+      })),
+    };
   },
 
   async registrarMovimentacao(caixaId: string, tipo: 'Suprimento' | 'Sangria', valor: number, motivo: string, operadorId: string): Promise<MovimentacaoCaixa> {

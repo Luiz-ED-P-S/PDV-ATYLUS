@@ -14,7 +14,11 @@ builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
 // Controllers e Swagger
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+    });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -25,12 +29,12 @@ builder.Services.AddSwaggerGen(c =>
 builder.Services.AddHostedService<GoogleDriveBackupWorker>();
 builder.Services.AddHostedService<CloudSyncWorker>();
 
-// Habilitar CORS para o frontend (Vite React na porta 5173 ou produção)
+// Habilitar CORS para o frontend (Vite React na porta 5173, 5000 ou produção)
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowLocalhost", policy =>
     {
-        policy.WithOrigins("http://localhost:5173", "http://localhost:3000", "https://localhost:5173")
+        policy.WithOrigins("http://localhost:5173", "http://localhost:3000", "https://localhost:5173", "http://localhost:5000", "https://localhost:5000")
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();

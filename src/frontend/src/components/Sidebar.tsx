@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Sparkles,
 } from 'lucide-react';
+import { useThemeStore } from '../store/useThemeStore';
 
 export type ModuloApp =
   | 'dashboard'
@@ -38,6 +39,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   colapsada,
   onToggleColapso,
 }) => {
+  const { theme } = useThemeStore();
+
   const menusPrincipais = [
     { id: 'dashboard' as ModuloApp, label: 'Painel', icon: LayoutDashboard },
     { id: 'pos' as ModuloApp, label: 'Nova Venda', icon: ShoppingCart },
@@ -64,29 +67,58 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="p-5 flex items-center justify-between border-b border-slate-100/80">
           {!colapsada ? (
             <div className="flex items-center gap-3">
-              {/* Ícone de Carrinho Azul Royal com Linhas de Movimento */}
-              <div className="w-10 h-10 rounded-2xl bg-blue-50 text-[#005bf8] flex items-center justify-center shrink-0 shadow-sm border border-blue-100/60">
-                <svg className="w-6 h-6 fill-current" viewBox="0 0 48 48">
-                  <path d="M4 14h10v3H4zm-2 7h12v3H2zm4 7h8v3H6z" opacity="0.9" />
-                  <path d="M16 11h24l-3.5 14.5H20.5L16 11zm1.5-3.5H12l-1 4H4v3h5.5l5 20h23v-3.5H18.2l-.9-3.5h18.2a2 2 0 001.95-1.55l3.8-15.5a2 2 0 00-1.95-2.45H17.5z" />
-                  <circle cx="21" cy="38" r="3.5" />
-                  <circle cx="35" cy="38" r="3.5" />
-                </svg>
-              </div>
-              <div className="leading-none">
-                <span className="font-extrabold text-base tracking-tight text-slate-900 block">
-                  PDV <span className="text-[#005bf8]">ATYLUS</span>
+              {/* Ícone ou Imagem de Logo Personalizada */}
+              {theme.logoUrl ? (
+                <img
+                  src={theme.logoUrl}
+                  alt={theme.nomeLoja}
+                  className="w-10 h-10 rounded-2xl object-cover shadow-sm border border-slate-200"
+                />
+              ) : (
+                <div
+                  className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-sm border"
+                  style={{
+                    backgroundColor: `${theme.corPrimaria}15`,
+                    color: theme.corPrimaria,
+                    borderColor: `${theme.corPrimaria}30`,
+                  }}
+                >
+                  <svg className="w-6 h-6 fill-current" viewBox="0 0 48 48">
+                    <path d="M4 14h10v3H4zm-2 7h12v3H2zm4 7h8v3H6z" opacity="0.9" />
+                    <path d="M16 11h24l-3.5 14.5H20.5L16 11zm1.5-3.5H12l-1 4H4v3h5.5l5 20h23v-3.5H18.2l-.9-3.5h18.2a2 2 0 001.95-1.55l3.8-15.5a2 2 0 00-1.95-2.45H17.5z" />
+                    <circle cx="21" cy="38" r="3.5" />
+                    <circle cx="35" cy="38" r="3.5" />
+                  </svg>
+                </div>
+              )}
+              <div className="leading-none truncate">
+                <span className="font-extrabold text-base tracking-tight text-slate-900 block truncate">
+                  PDV <span style={{ color: theme.corPrimaria }}>{theme.nomeLoja}</span>
                 </span>
                 <span className="text-[10px] font-semibold text-slate-400 tracking-wider flex items-center gap-1 mt-0.5 uppercase">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  OPEN
+                  {theme.subtituloLoja || 'OPEN'}
                 </span>
               </div>
             </div>
           ) : (
-            <div className="w-10 h-10 rounded-2xl bg-blue-50 text-[#005bf8] flex items-center justify-center mx-auto shadow-sm">
-              <ShoppingCart className="w-5 h-5" />
-            </div>
+            theme.logoUrl ? (
+              <img
+                src={theme.logoUrl}
+                alt={theme.nomeLoja}
+                className="w-10 h-10 rounded-2xl object-cover mx-auto shadow-sm"
+              />
+            ) : (
+              <div
+                className="w-10 h-10 rounded-2xl flex items-center justify-center mx-auto shadow-sm"
+                style={{
+                  backgroundColor: `${theme.corPrimaria}15`,
+                  color: theme.corPrimaria,
+                }}
+              >
+                <ShoppingCart className="w-5 h-5" />
+              </div>
+            )
           )}
 
           <button
@@ -115,20 +147,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   key={item.id}
                   onClick={() => onSelecionarModulo(item.id)}
                   title={colapsada ? item.label : undefined}
+                  style={isAtivo ? { backgroundColor: `${theme.corPrimaria}15`, color: theme.corPrimaria } : undefined}
                   className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl text-xs sm:text-sm font-semibold transition-all relative ${
                     isAtivo
-                      ? 'bg-blue-50 text-[#005bf8] font-bold shadow-sm'
+                      ? 'font-bold shadow-sm'
                       : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                   } ${colapsada ? 'justify-center px-0' : ''}`}
                 >
                   <Icone
-                    className={`w-5 h-5 shrink-0 ${
-                      isAtivo ? 'text-[#005bf8]' : 'text-slate-500'
-                    }`}
+                    className="w-5 h-5 shrink-0"
+                    style={{ color: isAtivo ? theme.corPrimaria : undefined }}
                   />
                   {!colapsada && <span>{item.label}</span>}
                   {isAtivo && !colapsada && (
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-[#005bf8] rounded-r-full" />
+                    <div
+                      className="absolute right-0 top-2 bottom-2 w-1 rounded-l-full"
+                      style={{ backgroundColor: theme.corPrimaria }}
+                    />
                   )}
                 </button>
               );
@@ -153,20 +188,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   key={item.id}
                   onClick={() => onSelecionarModulo(item.id)}
                   title={colapsada ? item.label : undefined}
+                  style={isAtivo ? { backgroundColor: `${theme.corPrimaria}15`, color: theme.corPrimaria } : undefined}
                   className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl text-xs sm:text-sm font-semibold transition-all relative ${
                     isAtivo
-                      ? 'bg-blue-50 text-[#005bf8] font-bold shadow-sm'
+                      ? 'font-bold shadow-sm'
                       : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                   } ${colapsada ? 'justify-center px-0' : ''}`}
                 >
                   <Icone
-                    className={`w-5 h-5 shrink-0 ${
-                      isAtivo ? 'text-[#005bf8]' : 'text-slate-500'
-                    }`}
+                    className="w-5 h-5 shrink-0"
+                    style={{ color: isAtivo ? theme.corPrimaria : undefined }}
                   />
                   {!colapsada && <span>{item.label}</span>}
                   {isAtivo && !colapsada && (
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-[#005bf8] rounded-r-full" />
+                    <div
+                      className="absolute right-0 top-2 bottom-2 w-1 rounded-l-full"
+                      style={{ backgroundColor: theme.corPrimaria }}
+                    />
                   )}
                 </button>
               );
@@ -175,7 +213,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      {/* Rodapé da Sidebar: Card Gradiente Azul Escuro com Estrelas */}
+      {/* Rodapé da Sidebar */}
       <div className="p-3">
         {!colapsada ? (
           <div className="relative overflow-hidden bg-gradient-to-br from-[#0c1833] via-[#0b1736] to-[#071026] text-white rounded-3xl p-4 shadow-lg border border-slate-800/40">
