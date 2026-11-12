@@ -58,6 +58,86 @@ namespace PDV.Infrastructure.Migrations
                     b.ToTable("Caixas");
                 });
 
+            modelBuilder.Entity("PDV.Domain.Entities.CobrancaPix", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("AtualizadoEm")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("CaixaId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ConfirmadoEm")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ExpiraEm")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("MetodoConfirmacao")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ObservacaoConfirmacao")
+                        .HasMaxLength(300)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("OperadorMatricula")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Provedor")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Status")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid?>("SupervisorId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SupervisorMatricula")
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TerminalId")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TxId")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("UtilizadoEm")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("Valor")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("VendaId")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("TxId")
+                        .IsUnique();
+
+                    b.HasIndex("VendaId");
+
+                    b.ToTable("CobrancasPix", (string)null);
+                });
+
             modelBuilder.Entity("PDV.Domain.Entities.ItemVenda", b =>
                 {
                     b.Property<Guid>("Id")

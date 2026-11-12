@@ -17,6 +17,7 @@ public class PdvDbContext : DbContext
     public DbSet<PagamentoVenda> PagamentosVenda => Set<PagamentoVenda>();
     public DbSet<Operador> Operadores => Set<Operador>();
     public DbSet<RegistroSincronizacao> FilaSincronizacao => Set<RegistroSincronizacao>();
+    public DbSet<CobrancaPix> CobrancasPix => Set<CobrancaPix>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -123,6 +124,25 @@ public class PdvDbContext : DbContext
             entity.Property(p => p.Valor).HasPrecision(18, 2);
             entity.Property(p => p.Troco).HasPrecision(18, 2);
             entity.Property(p => p.TxId).HasMaxLength(150);
+        });
+
+        // Configuração de CobrancaPix (cobranças persistidas; Status é token de concorrência)
+        modelBuilder.Entity<CobrancaPix>(entity =>
+        {
+            entity.ToTable("CobrancasPix");
+            entity.HasKey(c => c.Id);
+            entity.Property(c => c.Id).ValueGeneratedNever(); // Guid gerado pela aplicação (BaseEntity)
+            entity.Property(c => c.TxId).IsRequired().HasMaxLength(60);
+            entity.HasIndex(c => c.TxId).IsUnique();
+            entity.Property(c => c.Valor).HasPrecision(18, 2);
+            entity.Property(c => c.Provedor).IsRequired().HasMaxLength(40);
+            entity.Property(c => c.Status).IsConcurrencyToken();
+            entity.HasIndex(c => c.Status);
+            entity.Property(c => c.OperadorMatricula).IsRequired().HasMaxLength(50);
+            entity.Property(c => c.TerminalId).IsRequired().HasMaxLength(50);
+            entity.Property(c => c.SupervisorMatricula).HasMaxLength(50);
+            entity.Property(c => c.ObservacaoConfirmacao).HasMaxLength(300);
+            entity.HasIndex(c => c.VendaId);
         });
 
         // Configuração de Operador
