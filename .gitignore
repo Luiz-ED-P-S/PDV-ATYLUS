@@ -64,3 +64,8 @@ ehthumbs.db
 Desktop.ini
 $RECYCLE.BIN/
 .DS_Store
+
+# Desktop (Electron)
+/src/desktop/node_modules/
+/src/desktop/dist/
+/src/desktop/resources/
