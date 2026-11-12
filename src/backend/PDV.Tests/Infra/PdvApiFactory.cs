@@ -31,7 +31,6 @@ public class PdvApiFactory : WebApplicationFactory<Program>
         _dataDir = Path.Combine(Path.GetTempPath(), "pdv-tests-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_dataDir);
         _dataDirAnterior = Environment.GetEnvironmentVariable("PDV_DATA_DIR");
-        Environment.SetEnvironmentVariable("PDV_DATA_DIR", _dataDir);
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -46,6 +45,9 @@ public class PdvApiFactory : WebApplicationFactory<Program>
 
     protected override IHost CreateHost(IHostBuilder builder)
     {
+        // A pasta de dados é lida durante a inicialização do host; cada fábrica usa seu próprio SQLite temporário.
+        // (As coleções de teste rodam em sequência — ver AssemblyInfo.cs — para não disputarem esta variável.)
+        Environment.SetEnvironmentVariable("PDV_DATA_DIR", _dataDir);
         var host = base.CreateHost(builder);
 
         // Operador extra usado apenas pelo teste de troca de PIN
@@ -92,4 +94,14 @@ public class PdvApiFactory : WebApplicationFactory<Program>
 public class ApiCollection : ICollectionFixture<PdvApiFactory>
 {
     public const string Nome = "API PDV";
+}
+
+/// <summary>
+/// Coleção com banco temporário próprio para o ciclo completo do caixa
+/// (só pode haver um caixa aberto por banco).
+/// </summary>
+[CollectionDefinition(Nome)]
+public class CaixaCollection : ICollectionFixture<PdvApiFactory>
+{
+    public const string Nome = "API PDV - Caixa";
 }

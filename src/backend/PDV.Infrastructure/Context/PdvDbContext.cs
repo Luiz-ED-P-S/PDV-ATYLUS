@@ -22,10 +22,16 @@ public class PdvDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
+        // Todas as entidades herdam BaseEntity, cujo Id é um Guid criado no construtor (Guid.NewGuid()).
+        // Sem ValueGeneratedNever(), o EF supõe que o banco gera a chave e trata um filho novo, adicionado
+        // à coleção de uma entidade já rastreada (ex.: sangria/suprimento em Caixa), como registro existente
+        // (UPDATE em vez de INSERT), causando DbUpdateConcurrencyException. Não altera o esquema do SQLite.
+
         // Configuração de Produto
         modelBuilder.Entity<Produto>(entity =>
         {
             entity.HasKey(p => p.Id);
+            entity.Property(p => p.Id).ValueGeneratedNever(); // Guid gerado pela aplicação (BaseEntity)
             entity.HasIndex(p => p.CodigoBarras).IsUnique();
             entity.Property(p => p.CodigoBarras).IsRequired().HasMaxLength(60);
             entity.Property(p => p.Nome).IsRequired().HasMaxLength(200);
@@ -39,6 +45,7 @@ public class PdvDbContext : DbContext
         modelBuilder.Entity<Caixa>(entity =>
         {
             entity.HasKey(c => c.Id);
+            entity.Property(c => c.Id).ValueGeneratedNever(); // Guid gerado pela aplicação (BaseEntity)
             entity.Property(c => c.OperadorId).IsRequired().HasMaxLength(100);
             entity.Property(c => c.SaldoInicial).HasPrecision(18, 2);
             entity.Property(c => c.SaldoFinalInformado).HasPrecision(18, 2);
@@ -53,6 +60,7 @@ public class PdvDbContext : DbContext
         modelBuilder.Entity<MovimentacaoCaixa>(entity =>
         {
             entity.HasKey(m => m.Id);
+            entity.Property(m => m.Id).ValueGeneratedNever(); // Guid gerado pela aplicação (BaseEntity)
             entity.Property(m => m.Valor).HasPrecision(18, 2);
             entity.Property(m => m.Motivo).IsRequired().HasMaxLength(300);
             entity.Property(m => m.OperadorId).IsRequired().HasMaxLength(100);
@@ -62,6 +70,7 @@ public class PdvDbContext : DbContext
         modelBuilder.Entity<Venda>(entity =>
         {
             entity.HasKey(v => v.Id);
+            entity.Property(v => v.Id).ValueGeneratedNever(); // Guid gerado pela aplicação (BaseEntity)
             entity.Property(v => v.OperadorId).IsRequired().HasMaxLength(100);
             entity.Property(v => v.TerminalId).IsRequired().HasMaxLength(50).HasDefaultValue("CX01");
             entity.Property(v => v.NumeroSequencial).HasDefaultValue(1);
@@ -86,6 +95,7 @@ public class PdvDbContext : DbContext
         modelBuilder.Entity<RegistroSincronizacao>(entity =>
         {
             entity.HasKey(s => s.Id);
+            entity.Property(s => s.Id).ValueGeneratedNever(); // Guid gerado pela aplicação (BaseEntity)
             entity.Property(s => s.TerminalId).IsRequired().HasMaxLength(50);
             entity.Property(s => s.TipoEntidade).IsRequired().HasMaxLength(100);
             entity.Property(s => s.Operacao).IsRequired().HasMaxLength(50);
@@ -98,6 +108,7 @@ public class PdvDbContext : DbContext
         modelBuilder.Entity<ItemVenda>(entity =>
         {
             entity.HasKey(i => i.Id);
+            entity.Property(i => i.Id).ValueGeneratedNever(); // Guid gerado pela aplicação (BaseEntity)
             entity.Property(i => i.ProdutoNome).IsRequired().HasMaxLength(200);
             entity.Property(i => i.CodigoBarras).IsRequired().HasMaxLength(60);
             entity.Property(i => i.Quantidade).HasPrecision(18, 3);
@@ -108,6 +119,7 @@ public class PdvDbContext : DbContext
         modelBuilder.Entity<PagamentoVenda>(entity =>
         {
             entity.HasKey(p => p.Id);
+            entity.Property(p => p.Id).ValueGeneratedNever(); // Guid gerado pela aplicação (BaseEntity)
             entity.Property(p => p.Valor).HasPrecision(18, 2);
             entity.Property(p => p.Troco).HasPrecision(18, 2);
             entity.Property(p => p.TxId).HasMaxLength(150);
@@ -117,6 +129,7 @@ public class PdvDbContext : DbContext
         modelBuilder.Entity<Operador>(entity =>
         {
             entity.HasKey(o => o.Id);
+            entity.Property(o => o.Id).ValueGeneratedNever(); // Guid gerado pela aplicação (BaseEntity)
             entity.HasIndex(o => o.Matricula).IsUnique();
             entity.Property(o => o.Nome).IsRequired().HasMaxLength(100);
             entity.Property(o => o.Matricula).IsRequired().HasMaxLength(50);
