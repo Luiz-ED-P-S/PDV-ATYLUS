@@ -95,15 +95,18 @@ public class AuthController : ControllerBase
         if (_limiter.TempoRestanteBloqueio(chave) is { } restante)
             return Bloqueado(restante);
 
-        var ok = await _mediator.Send(new AlterarPinCommand(id.Value, request.PinAtual ?? string.Empty, request.NovoPin ?? string.Empty), cancellationToken);
-        if (!ok)
+        var operador = await _mediator.Send(new AlterarPinCommand(id.Value, request.PinAtual ?? string.Empty, request.NovoPin ?? string.Empty), cancellationToken);
+        if (operador == null)
         {
             _limiter.RegistrarFalha(chave);
             return BadRequest(new { mensagem = "PIN atual incorreto." });
         }
 
         _limiter.RegistrarSucesso(chave);
-        return Ok(new { mensagem = "PIN alterado com sucesso." });
+
+        // Tokens anteriores deixam de valer após a troca; o terminal atual recebe um novo para continuar a sessão
+        var (token, expiraEm) = _tokenService.GerarToken(operador);
+        return Ok(new { mensagem = "PIN alterado com sucesso.", token, expiraEm, operador = OperadorResponse.De(operador) });
     }
 
     private ObjectResult Bloqueado(TimeSpan restante)

@@ -36,6 +36,8 @@ client_secret*.json
 *.p12
 *.pem
 *.key
+# Chave JWT do PDV, cópias em quarentena (*.corrompida-*) e temporários de gravação
+jwt-signing.key*
 appsettings.Production.json
 appsettings.Local.json
 

@@ -46,9 +46,11 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// Autenticação local e offline: JWT assinado com chave simétrica guardada na própria máquina
-var jwtOptions = JwtOptions.Carregar(builder.Configuration, builder.Environment);
-builder.Services.AddSingleton(jwtOptions);
+// Autenticação local e offline: JWT assinado com chave simétrica guardada em diretório de dados protegido
+builder.Services.AddSingleton(sp => JwtOptions.Carregar(
+    sp.GetRequiredService<IConfiguration>(),
+    sp.GetRequiredService<IHostEnvironment>(),
+    sp.GetRequiredService<ILoggerFactory>().CreateLogger("PDV.Seguranca.ChaveJwt")));
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<LoginAttemptLimiter>(sp => new LoginAttemptLimiter(sp.GetRequiredService<TimeProvider>()));
@@ -58,9 +60,14 @@ builder.Services
     .AddJwtBearer(options =>
     {
         options.MapInboundClaims = false;
-        options.TokenValidationParameters = jwtOptions.ParametrosValidacao();
+        // Recusa tokens de operadores desativados ou emitidos antes de troca de PIN/perfil
+        options.Events = new JwtBearerEvents { OnTokenValidated = ValidadorSessaoOperador.ValidarAsync };
     })
     .AddScheme<AuthenticationSchemeOptions, SyncApiKeyAuthenticationHandler>(SyncApiKeyAuthenticationHandler.NomeEsquema, null);
+
+builder.Services
+    .AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+    .Configure<JwtOptions>((options, jwt) => options.TokenValidationParameters = jwt.ParametrosValidacao());
 
 builder.Services.AddAuthorization(options =>
 {
@@ -87,6 +94,17 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+// Carrega a chave de autenticação ANTES de tocar no banco: sem chave confiável a API não inicia (falha segura)
+try
+{
+    app.Services.GetRequiredService<JwtOptions>();
+}
+catch (ChaveJwtException ex)
+{
+    app.Logger.LogCritical("Falha ao carregar a chave de autenticação ({Tipo}): {Mensagem}", ex.Tipo, ex.Message);
+    throw;
+}
 
 // Inicialização automática do banco SQLite e Carga Inicial (Seed)
 using (var scope = app.Services.CreateScope())

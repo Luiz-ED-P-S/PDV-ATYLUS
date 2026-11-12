@@ -90,9 +90,11 @@ export const authApi = {
     }
   },
 
-  async alterarPin(pinAtual: string, novoPin: string): Promise<void> {
+  /** Troca o PIN; o backend invalida os tokens anteriores e devolve um novo para esta sessão. */
+  async alterarPin(pinAtual: string, novoPin: string): Promise<LoginResposta> {
     try {
-      await api.post('/auth/alterar-pin', { pinAtual, novoPin });
+      const res = await api.post<LoginResposta>('/auth/alterar-pin', { pinAtual, novoPin });
+      return res.data;
     } catch (err: any) {
       throw new Error(mensagemDeErro(err, 'Não foi possível alterar o PIN.'));
     }

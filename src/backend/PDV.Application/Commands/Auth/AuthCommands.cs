@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using MediatR;
 using PDV.Domain.Entities;
 using PDV.Domain.Enums;
@@ -8,13 +10,29 @@ namespace PDV.Application.Commands.Auth;
 
 /// <summary>
 /// Dados do operador autenticado com sucesso (nunca inclui o hash do PIN).
+/// <see cref="EstadoSeguranca"/> é uso interno da API (carimbo do token) e não é devolvido ao cliente.
 /// </summary>
 public record OperadorAutenticadoDto(
     Guid Id,
     string Nome,
     string Matricula,
     PerfilOperador Perfil,
-    bool UsaPinPadrao);
+    bool UsaPinPadrao,
+    string EstadoSeguranca);
+
+/// <summary>
+/// Resumo do estado de segurança do operador sem alterar o esquema do banco: muda sempre que o hash BCrypt
+/// do PIN muda (cada troca gera novo salt, inclusive alterações feitas direto no banco) ou o perfil muda.
+/// Não usa AtualizadoEm, que só é atualizado por AtualizarPin e não cobre desativação nem edições externas.
+/// </summary>
+public static class EstadoSegurancaOperador
+{
+    public static string Calcular(Operador operador)
+    {
+        var bruto = $"{operador.Id:N}|{operador.Pin}|{(int)operador.Perfil}";
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(bruto)));
+    }
+}
 
 /// <summary>
 /// Autentica um operador ativo por matrícula + PIN, validando o hash BCrypt armazenado no SQLite.
@@ -57,7 +75,7 @@ public class AutenticarOperadorCommandHandler : IRequestHandler<AutenticarOperad
     }
 
     internal static OperadorAutenticadoDto ParaDto(Operador operador, bool usaPinPadrao) =>
-        new(operador.Id, operador.Nome, operador.Matricula, operador.Perfil, usaPinPadrao);
+        new(operador.Id, operador.Nome, operador.Matricula, operador.Perfil, usaPinPadrao, EstadoSegurancaOperador.Calcular(operador));
 }
 
 /// <summary>
@@ -86,11 +104,34 @@ public class ValidarPinSupervisorCommandHandler : IRequestHandler<ValidarPinSupe
 }
 
 /// <summary>
-/// Troca o PIN do próprio operador autenticado, exigindo o PIN atual.
+/// Estado de segurança atual de um operador ATIVO, usado para validar cada token recebido.
+/// Retorna null se o operador não existe ou foi desativado.
 /// </summary>
-public record AlterarPinCommand(Guid OperadorId, string PinAtual, string NovoPin) : IRequest<bool>;
+public record ObterEstadoSegurancaOperadorQuery(Guid OperadorId) : IRequest<string?>;
 
-public class AlterarPinCommandHandler : IRequestHandler<AlterarPinCommand, bool>
+public class ObterEstadoSegurancaOperadorQueryHandler : IRequestHandler<ObterEstadoSegurancaOperadorQuery, string?>
+{
+    private readonly IOperadorRepository _operadorRepository;
+
+    public ObterEstadoSegurancaOperadorQueryHandler(IOperadorRepository operadorRepository)
+    {
+        _operadorRepository = operadorRepository;
+    }
+
+    public async Task<string?> Handle(ObterEstadoSegurancaOperadorQuery request, CancellationToken cancellationToken)
+    {
+        var operador = await _operadorRepository.ObterPorIdAsync(request.OperadorId, cancellationToken);
+        return operador is { Ativo: true } ? EstadoSegurancaOperador.Calcular(operador) : null;
+    }
+}
+
+/// <summary>
+/// Troca o PIN do próprio operador autenticado, exigindo o PIN atual.
+/// Retorna os dados atualizados (para emitir um novo token) ou null se o PIN atual estiver incorreto.
+/// </summary>
+public record AlterarPinCommand(Guid OperadorId, string PinAtual, string NovoPin) : IRequest<OperadorAutenticadoDto?>;
+
+public class AlterarPinCommandHandler : IRequestHandler<AlterarPinCommand, OperadorAutenticadoDto?>
 {
     private readonly IOperadorRepository _operadorRepository;
     private readonly IUnitOfWork _unitOfWork;
@@ -101,11 +142,11 @@ public class AlterarPinCommandHandler : IRequestHandler<AlterarPinCommand, bool>
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<bool> Handle(AlterarPinCommand request, CancellationToken cancellationToken)
+    public async Task<OperadorAutenticadoDto?> Handle(AlterarPinCommand request, CancellationToken cancellationToken)
     {
         var operador = await _operadorRepository.ObterPorIdAsync(request.OperadorId, cancellationToken);
         if (operador == null || !operador.Ativo || !operador.ValidarPin(request.PinAtual))
-            return false;
+            return null;
 
         var novoPin = (request.NovoPin ?? string.Empty).Trim();
         if (novoPin == request.PinAtual.Trim())
@@ -113,6 +154,6 @@ public class AlterarPinCommandHandler : IRequestHandler<AlterarPinCommand, bool>
 
         operador.AtualizarPin(novoPin);
         await _unitOfWork.CommitAsync(cancellationToken);
-        return true;
+        return AutenticarOperadorCommandHandler.ParaDto(operador, usaPinPadrao: false);
     }
 }

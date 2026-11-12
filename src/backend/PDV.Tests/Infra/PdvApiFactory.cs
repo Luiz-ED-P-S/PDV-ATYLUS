@@ -22,19 +22,38 @@ public class PdvApiFactory : WebApplicationFactory<Program>
     public const string HubApiKey = "chave-hub-de-teste";
     public const string MatriculaTeste = "TST01";
     public const string PinTeste = "5678";
+    public const string MatriculaDesativar = "TST02";
+    public const string MatriculaTrocaPin = "TST03";
+    public const string PinExtras = "2468";
 
-    private readonly string _dataDir;
-    private readonly string? _dataDirAnterior;
+    // Variáveis que decidem onde ficam banco e chave; são isoladas durante o teste e restauradas no fim
+    private static readonly string[] VariaveisIsoladas = { "PDV_DATA_DIR", "PDV_JWT_KEY_DIR", "PDV_JWT_KEY", "PDV_DESKTOP_MODE" };
 
-    public PdvApiFactory()
+    private readonly bool _apagarAoDescartar;
+    private readonly string? _contentRoot;
+    private readonly Dictionary<string, string?> _variaveisAnteriores = new();
+
+    public string DataDir { get; }
+
+    public PdvApiFactory() : this(null, apagarAoDescartar: true) { }
+
+    /// <param name="dataDir">Pasta de dados temporária (reutilizável para simular reinício da API).</param>
+    /// <param name="apagarAoDescartar">Apaga a pasta ao descartar a fábrica.</param>
+    /// <param name="contentRoot">Pasta "de instalação" alternativa, para simular atualização do aplicativo.</param>
+    protected PdvApiFactory(string? dataDir, bool apagarAoDescartar, string? contentRoot = null)
     {
-        _dataDir = Path.Combine(Path.GetTempPath(), "pdv-tests-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(_dataDir);
-        _dataDirAnterior = Environment.GetEnvironmentVariable("PDV_DATA_DIR");
+        DataDir = dataDir ?? Path.Combine(Path.GetTempPath(), "pdv-tests-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(DataDir);
+        _apagarAoDescartar = apagarAoDescartar;
+        _contentRoot = contentRoot;
+        foreach (var v in VariaveisIsoladas)
+            _variaveisAnteriores[v] = Environment.GetEnvironmentVariable(v);
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        if (_contentRoot != null)
+            builder.UseContentRoot(_contentRoot);
         builder.UseEnvironment("Testing");
         builder.UseSetting("CloudSync:HubApiKey", HubApiKey);
         builder.ConfigureTestServices(services =>
@@ -47,17 +66,20 @@ public class PdvApiFactory : WebApplicationFactory<Program>
     {
         // A pasta de dados é lida durante a inicialização do host; cada fábrica usa seu próprio SQLite temporário.
         // (As coleções de teste rodam em sequência — ver AssemblyInfo.cs — para não disputarem esta variável.)
-        Environment.SetEnvironmentVariable("PDV_DATA_DIR", _dataDir);
+        foreach (var v in VariaveisIsoladas)
+            Environment.SetEnvironmentVariable(v, null);
+        Environment.SetEnvironmentVariable("PDV_DATA_DIR", DataDir);
         var host = base.CreateHost(builder);
 
-        // Operador extra usado apenas pelo teste de troca de PIN
+        // Operadores extras usados apenas pelos testes de troca de PIN e desativação
         using var scope = host.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<PdvDbContext>();
-        if (!db.Operadores.Any(o => o.Matricula == MatriculaTeste))
+        foreach (var (matricula, pin) in new[] { (MatriculaTeste, PinTeste), (MatriculaDesativar, PinExtras), (MatriculaTrocaPin, PinExtras) })
         {
-            db.Operadores.Add(new Operador("Operador de Teste", MatriculaTeste, PinTeste, PerfilOperador.Operador));
-            db.SaveChanges();
+            if (!db.Operadores.Any(o => o.Matricula == matricula))
+                db.Operadores.Add(new Operador($"Operador de Teste {matricula}", matricula, pin, PerfilOperador.Operador));
         }
+        db.SaveChanges();
 
         return host;
     }
@@ -81,13 +103,35 @@ public class PdvApiFactory : WebApplicationFactory<Program>
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
-        Environment.SetEnvironmentVariable("PDV_DATA_DIR", _dataDirAnterior);
+        foreach (var (v, valor) in _variaveisAnteriores)
+            Environment.SetEnvironmentVariable(v, valor);
         SqliteConnection.ClearAllPools();
-        try { Directory.Delete(_dataDir, recursive: true); } catch { /* arquivo temporário: melhor esforço */ }
+        if (_apagarAoDescartar)
+        {
+            try { Directory.Delete(DataDir, recursive: true); } catch { /* arquivo temporário: melhor esforço */ }
+        }
     }
 
     public record OperadorBody(Guid Id, string Nome, string Matricula, string Perfil, bool UsaPinPadrao);
     public record LoginBody(string Token, DateTime ExpiraEm, OperadorBody Operador);
+
+    public async Task<LoginBody> LoginAsync(string matricula, string pin)
+    {
+        using var client = CreateClient();
+        var resp = await client.PostAsJsonAsync("/api/v1/auth/login", new { matricula, pin });
+        resp.EnsureSuccessStatusCode();
+        return (await resp.Content.ReadFromJsonAsync<LoginBody>())!;
+    }
+}
+
+/// <summary>
+/// Fábrica com pasta de dados escolhida pelo teste (ex.: reutilizada entre "reinícios" da API).
+/// Separada porque fixtures do xUnit precisam de um único construtor público.
+/// </summary>
+public sealed class PdvApiFactoryPersonalizada : PdvApiFactory
+{
+    public PdvApiFactoryPersonalizada(string dataDir, bool apagarAoDescartar, string? contentRoot = null)
+        : base(dataDir, apagarAoDescartar, contentRoot) { }
 }
 
 [CollectionDefinition(Nome)]

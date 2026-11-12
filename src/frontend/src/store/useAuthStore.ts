@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { authApi, setAuthToken, setOnUnauthorized } from '../services/api';
+import { authApi, LoginResposta, setAuthToken, setOnUnauthorized } from '../services/api';
 
 export type PerfilOperador = 'Operador' | 'Supervisor';
 
@@ -116,6 +116,27 @@ const carregarSessao = (): { operador: OperadorAuth; autenticado: boolean; token
   return { operador: operadorDeslogado, autenticado: false, token: null };
 };
 
+/** Valida e grava a sessão devolvida pelo backend (login ou troca de PIN). */
+const persistirSessao = (resposta: LoginResposta): { operador: OperadorAuth; token: string } => {
+  const payload = decodificarToken(resposta.token);
+  if (!tokenValido(payload)) {
+    throw new Error('Token de acesso inválido recebido do servidor.');
+  }
+
+  const sessao: SessaoSalva = {
+    token: resposta.token,
+    operador: {
+      id: resposta.operador.id,
+      matricula: resposta.operador.matricula,
+      nome: resposta.operador.nome,
+    },
+  };
+
+  gravarJson(STORAGE_KEY_SESSAO, sessao);
+  setAuthToken(resposta.token);
+  return { operador: montarOperador(sessao, payload), token: resposta.token };
+};
+
 interface AuthState {
   operador: OperadorAuth;
   autenticado: boolean;
@@ -145,28 +166,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
    */
   login: async (matricula, pin) => {
     const resposta = await authApi.login(matricula.trim().toUpperCase(), pin);
-    const payload = decodificarToken(resposta.token);
-    if (!tokenValido(payload)) {
-      throw new Error('Token de acesso inválido recebido do servidor.');
-    }
-
-    const sessao: SessaoSalva = {
-      token: resposta.token,
-      operador: {
-        id: resposta.operador.id,
-        matricula: resposta.operador.matricula,
-        nome: resposta.operador.nome,
-      },
-    };
-
-    gravarJson(STORAGE_KEY_SESSAO, sessao);
-    setAuthToken(resposta.token);
-    set({
-      operador: montarOperador(sessao, payload),
-      autenticado: true,
-      token: resposta.token,
-      usaPinPadrao: resposta.operador.usaPinPadrao,
-    });
+    const { operador, token } = persistirSessao(resposta);
+    set({ operador, autenticado: true, token, usaPinPadrao: resposta.operador.usaPinPadrao });
     return true;
   },
 
@@ -194,8 +195,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   alterarPin: async (pinAtual, novoPin) => {
-    await authApi.alterarPin(pinAtual, novoPin);
-    set({ usaPinPadrao: false });
+    // O backend invalida o token anterior e devolve um novo; a sessão deste terminal continua ativa
+    const resposta = await authApi.alterarPin(pinAtual, novoPin);
+    const { operador, token } = persistirSessao(resposta);
+    set({ operador, autenticado: true, token, usaPinPadrao: false });
   },
 
   atualizarPerfil: dados => {

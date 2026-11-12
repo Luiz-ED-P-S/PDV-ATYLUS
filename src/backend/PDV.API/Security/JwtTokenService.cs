@@ -27,66 +27,68 @@ public class JwtOptions
     public const string Issuer = "PDV-ATYLUS";
     public const string Audience = "PDV-ATYLUS-Terminais";
 
-    public SymmetricSecurityKey ChaveAssinatura { get; init; } = null!;
-    public TimeSpan Validade { get; init; } = TimeSpan.FromHours(12);
+    public const string ClaimCarimbo = "sstamp";
 
-    /// <summary>
-    /// Resolve a chave de assinatura totalmente offline:
-    /// 1) variável de ambiente PDV_JWT_KEY ou configuração Jwt:SigningKey (Base64, mín. 32 bytes);
-    /// 2) caso contrário, gera uma chave aleatória e a persiste em "jwt-signing.key" na pasta de dados
-    ///    (mesma lógica de diretório do banco). O arquivo é ignorado pelo Git (*.key).
-    /// </summary>
-    public static JwtOptions Carregar(IConfiguration configuration, IHostEnvironment environment)
+    public SymmetricSecurityKey ChaveAssinatura { get; }
+    public TimeSpan Validade { get; }
+
+    private readonly byte[] _chave;
+
+    public JwtOptions(byte[] chave, TimeSpan validade)
     {
-        var horas = configuration.GetValue<double?>("Jwt:ExpiracaoHoras") ?? 12;
-        var chaveConfigurada = Environment.GetEnvironmentVariable("PDV_JWT_KEY") ?? configuration["Jwt:SigningKey"];
+        if (chave.Length < JwtKeyStore.TamanhoMinimoBytes)
+            throw new ChaveJwtException(TipoFalhaChaveJwt.ConfiguracaoInvalida,
+                $"A chave de assinatura deve possuir no mínimo {JwtKeyStore.TamanhoMinimoBytes} bytes.");
 
-        byte[] chave;
-        if (!string.IsNullOrWhiteSpace(chaveConfigurada))
-        {
-            chave = Convert.FromBase64String(chaveConfigurada.Trim());
-        }
-        else
-        {
-            var arquivo = Path.Combine(ResolverDiretorioDados(environment), "jwt-signing.key");
-            if (File.Exists(arquivo))
-            {
-                chave = Convert.FromBase64String(File.ReadAllText(arquivo).Trim());
-            }
-            else
-            {
-                chave = RandomNumberGenerator.GetBytes(64);
-                File.WriteAllText(arquivo, Convert.ToBase64String(chave));
-            }
-        }
-
-        if (chave.Length < 32)
-            throw new InvalidOperationException("A chave de assinatura JWT deve possuir no mínimo 32 bytes.");
-
-        return new JwtOptions
-        {
-            ChaveAssinatura = new SymmetricSecurityKey(chave),
-            Validade = TimeSpan.FromHours(horas)
-        };
+        _chave = chave;
+        ChaveAssinatura = new SymmetricSecurityKey(chave);
+        Validade = validade;
     }
 
-    private static string ResolverDiretorioDados(IHostEnvironment environment)
+    /// <summary>
+    /// Resolve a chave de assinatura totalmente offline, sem nunca registrá-la em log:
+    /// 1) PDV_JWT_KEY ou Jwt:SigningKey (Base64, mín. 32 bytes) — inválida = falha de inicialização;
+    /// 2) caso contrário, arquivo protegido gerenciado por <see cref="JwtKeyStore"/> no diretório de dados
+    ///    (PDV_JWT_KEY_DIR → PDV_DATA_DIR → %APPDATA%\PDV-ATYLUS), migrando a chave legada da pasta de instalação.
+    /// </summary>
+    public static JwtOptions Carregar(IConfiguration configuration, IHostEnvironment environment, ILogger logger)
     {
-        var customDataDir = Environment.GetEnvironmentVariable("PDV_DATA_DIR");
-        if (!string.IsNullOrWhiteSpace(customDataDir))
+        var validade = TimeSpan.FromHours(configuration.GetValue<double?>("Jwt:ExpiracaoHoras") ?? 12);
+        var chaveConfigurada = Environment.GetEnvironmentVariable("PDV_JWT_KEY") ?? configuration["Jwt:SigningKey"];
+
+        if (!string.IsNullOrWhiteSpace(chaveConfigurada))
         {
-            Directory.CreateDirectory(customDataDir);
-            return customDataDir;
+            byte[] chave;
+            try
+            {
+                chave = Convert.FromBase64String(chaveConfigurada.Trim());
+            }
+            catch (FormatException)
+            {
+                throw new ChaveJwtException(TipoFalhaChaveJwt.ConfiguracaoInvalida,
+                    "A chave definida em PDV_JWT_KEY/Jwt:SigningKey não é Base64 válido.");
+            }
+            return new JwtOptions(chave, validade);
         }
 
-        if (Environment.GetEnvironmentVariable("PDV_DESKTOP_MODE") == "1")
-        {
-            var appData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "PDV-ATYLUS");
-            Directory.CreateDirectory(appData);
-            return appData;
-        }
+        var diretorio = JwtKeyStore.ResolverDiretorio(
+            Environment.GetEnvironmentVariable("PDV_JWT_KEY_DIR") ?? configuration["Jwt:DiretorioChave"],
+            Environment.GetEnvironmentVariable("PDV_DATA_DIR"),
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData));
 
-        return environment.ContentRootPath;
+        // Versões anteriores gravavam a chave na pasta de execução (ContentRoot); ela é migrada se for válida.
+        var store = new JwtKeyStore(diretorio, logger, diretorioLegado: environment.ContentRootPath);
+        return new JwtOptions(store.ObterOuCriarChave(), validade);
+    }
+
+    /// <summary>
+    /// Vincula o token ao estado de segurança do operador (hash do PIN + perfil) sem expor esse estado:
+    /// HMAC-SHA256 com a chave de assinatura, truncado a 128 bits.
+    /// </summary>
+    public string CalcularCarimbo(string estadoSegurancaOperador)
+    {
+        var mac = HMACSHA256.HashData(_chave, Encoding.UTF8.GetBytes(estadoSegurancaOperador));
+        return Base64UrlEncoder.Encode(mac.AsSpan(0, 16).ToArray());
     }
 
     public TokenValidationParameters ParametrosValidacao() => new()
@@ -123,7 +125,8 @@ public class JwtTokenService
             new(ClaimTypes.NameIdentifier, operador.Id.ToString()),
             new(ClaimTypes.Name, operador.Nome),
             new(PdvClaims.Matricula, operador.Matricula),
-            new(ClaimTypes.Role, operador.Perfil.ToString())
+            new(ClaimTypes.Role, operador.Perfil.ToString()),
+            new(JwtOptions.ClaimCarimbo, _options.CalcularCarimbo(operador.EstadoSeguranca))
         };
 
         var token = new JwtSecurityToken(
