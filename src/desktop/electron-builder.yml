@@ -34,7 +34,8 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: always
   createStartMenuShortcut: true
-  shortcutName: ATYLUS PDV
+  runAfterFinish: false             # nem a instalacao silenciosa (/S) nem a normal abrem o app sozinhas
+  shortcutName: ATYLUS PDV Desktop   # nome distinto: nao substitui atalhos "ATYLUS PDV" de instalacoes anteriores
   deleteAppDataOnUninstall: false   # preserva banco SQLite e chave JWT ao desinstalar
   installerIcon: assets/icon.ico
   uninstallerIcon: assets/icon.ico
