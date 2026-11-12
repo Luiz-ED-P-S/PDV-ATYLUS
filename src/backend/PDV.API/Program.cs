@@ -18,6 +18,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Configuração das camadas Clean Architecture
 builder.Services.AddApplication();
+
+// Pix: simulação somente com Pix:PermitirSimulacao=true E ambiente Development/Testing (decidido no servidor)
+builder.Services.AddSingleton(PDV.Application.Commands.Pix.OpcoesPix.Para(
+    builder.Environment.EnvironmentName,
+    bool.TryParse(builder.Configuration["Pix:PermitirSimulacao"], out var pixSimulacao) && pixSimulacao));
 builder.Services.AddInfrastructure(builder.Configuration);
 
 // Controllers e Swagger

@@ -4,6 +4,8 @@ using Microsoft.Extensions.DependencyInjection;
 using PDV.Domain.Interfaces;
 using PDV.Infrastructure.Context;
 using PDV.Infrastructure.Persistence;
+using PDV.Infrastructure.Services.Pix;
+using PDV.Application.Commands.Pix;
 using PDV.Infrastructure.Repositories;
 using PDV.Infrastructure.Services;
 
@@ -61,7 +63,10 @@ public static class DependencyInjection
         services.AddScoped<MigradorBancoDados>();
 
         // Serviços Externos e de Suporte
-        services.AddSingleton<IPixService, PixSimulatorService>();
+        // Pix: simulador só quando OpcoesPix (definida pela API a partir do ambiente) permitir; senão confirmação manual.
+        services.AddScoped<ICobrancaPixRepository, CobrancaPixRepository>();
+        services.AddSingleton<IPixProvedor>(sp =>
+            (sp.GetService<OpcoesPix>()?.PermitirSimulacao ?? false) ? new PixSimuladoProvedor() : new PixManualProvedor());
         services.AddScoped<IGoogleDriveBackupService, GoogleDriveBackupService>();
         services.AddScoped<IThermalPrinterService, ThermalPrinterService>();
         services.AddHttpClient<ISpreadsheetAiService, SpreadsheetAiService>();

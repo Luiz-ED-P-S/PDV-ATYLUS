@@ -48,26 +48,32 @@ public class CriarVendaCommandValidator : AbstractValidator<CriarVendaCommand>
     }
 }
 
-public class CriarVendaCommandHandler : IRequestHandler<CriarVendaCommand, VendaDto>
+public partial class CriarVendaCommandHandler : IRequestHandler<CriarVendaCommand, VendaDto>
 {
     private readonly IVendaRepository _vendaRepository;
     private readonly ICaixaRepository _caixaRepository;
     private readonly IProdutoRepository _produtoRepository;
     private readonly ICloudSyncService _cloudSyncService;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ICobrancaPixRepository _cobrancasPix;
+    private readonly TimeProvider _relogio;
 
     public CriarVendaCommandHandler(
         IVendaRepository vendaRepository,
         ICaixaRepository caixaRepository,
         IProdutoRepository produtoRepository,
         ICloudSyncService cloudSyncService,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        ICobrancaPixRepository cobrancasPix,
+        TimeProvider relogio)
     {
         _vendaRepository = vendaRepository;
         _caixaRepository = caixaRepository;
         _produtoRepository = produtoRepository;
         _cloudSyncService = cloudSyncService;
         _unitOfWork = unitOfWork;
+        _cobrancasPix = cobrancasPix;
+        _relogio = relogio;
     }
 
     public async Task<VendaDto> Handle(CriarVendaCommand request, CancellationToken cancellationToken)
@@ -116,8 +122,12 @@ public class CriarVendaCommandHandler : IRequestHandler<CriarVendaCommand, Venda
             }
 
             // Processa os pagamentos
+            var txIdsPix = new HashSet<string>(StringComparer.Ordinal);
             foreach (var pag in request.Pagamentos)
             {
+                if (pag.FormaPagamento == FormaPagamento.Pix)
+                    await VincularCobrancaPixAsync(pag, venda, caixaAberto.Id, txIdsPix, cancellationToken);
+
                 venda.AdicionarPagamento(pag.FormaPagamento, pag.Valor, pag.Troco, pag.TxId);
             }
 
@@ -149,6 +159,28 @@ public class CriarVendaCommandHandler : IRequestHandler<CriarVendaCommand, Venda
             await _unitOfWork.RollbackTransactionAsync(cancellationToken);
             throw;
         }
+    }
+}
+
+public partial class CriarVendaCommandHandler
+{
+    /// <summary>
+    /// Pix só entra na venda com uma cobrança persistida, CONFIRMADA no backend, ainda não utilizada, do mesmo
+    /// caixa e com o mesmo valor. A cobrança é marcada como Utilizada na MESMA transação da venda; o Status é
+    /// token de concorrência, então duas vendas simultâneas com a mesma cobrança não conseguem ambas concluir.
+    /// </summary>
+    private async Task VincularCobrancaPixAsync(CriarVendaPagamentoInput pag, Venda venda, Guid caixaId, HashSet<string> jaUsados, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(pag.TxId))
+            throw new DomainException("Pagamento Pix sem cobrança: gere a cobrança e aguarde a confirmação do recebimento.");
+        if (pag.Troco != 0)
+            throw new DomainException("Pagamento Pix não pode ter troco.");
+        if (!jaUsados.Add(pag.TxId.Trim()))
+            throw new ConflitoException($"A cobrança Pix {pag.TxId} foi informada mais de uma vez na mesma venda.");
+
+        var cobranca = await _cobrancasPix.ObterPorTxIdAsync(pag.TxId.Trim(), cancellationToken)
+                       ?? throw new DomainException($"Cobrança Pix {pag.TxId} não encontrada.");
+        cobranca.Utilizar(venda.Id, caixaId, pag.Valor, _relogio.GetUtcNow().UtcDateTime);
     }
 }
 
