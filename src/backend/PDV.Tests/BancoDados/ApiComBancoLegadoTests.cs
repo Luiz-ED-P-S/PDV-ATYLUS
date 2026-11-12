@@ -64,7 +64,7 @@ public class ApiComBancoLegadoTests : IDisposable
 
         factory.Dispose();
         SqliteConnection.ClearAllPools();
-        Assert.Equal(2, Historico(caminho).Count);
+        Assert.Equal(TodasMigracoes.Count, Historico(caminho).Count);
         Assert.Single(BancosDeTeste.Backups(_pasta));
     }
 

@@ -31,17 +31,22 @@ public class PdvApiFactory : WebApplicationFactory<Program>
 
     private readonly bool _apagarAoDescartar;
     private readonly string? _contentRoot;
+    private readonly string _ambiente;
     private readonly Dictionary<string, string?> _variaveisAnteriores = new();
 
     public string DataDir { get; }
 
     public PdvApiFactory() : this(null, apagarAoDescartar: true) { }
 
+    /// <summary>Ambiente do host (padrão "Testing", com simulação de Pix explicitamente autorizada).</summary>
+    public string Ambiente => _ambiente;
+
     /// <param name="dataDir">Pasta de dados temporária (reutilizável para simular reinício da API).</param>
     /// <param name="apagarAoDescartar">Apaga a pasta ao descartar a fábrica.</param>
     /// <param name="contentRoot">Pasta "de instalação" alternativa, para simular atualização do aplicativo.</param>
-    protected PdvApiFactory(string? dataDir, bool apagarAoDescartar, string? contentRoot = null)
+    protected PdvApiFactory(string? dataDir, bool apagarAoDescartar, string? contentRoot = null, string ambiente = "Testing")
     {
+        _ambiente = ambiente;
         DataDir = dataDir ?? Path.Combine(Path.GetTempPath(), "pdv-tests-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(DataDir);
         _apagarAoDescartar = apagarAoDescartar;
@@ -54,8 +59,10 @@ public class PdvApiFactory : WebApplicationFactory<Program>
     {
         if (_contentRoot != null)
             builder.UseContentRoot(_contentRoot);
-        builder.UseEnvironment("Testing");
+        builder.UseEnvironment(_ambiente);
         builder.UseSetting("CloudSync:HubApiKey", HubApiKey);
+        // Simulação de Pix pedida explicitamente; o servidor só a habilita em Development/Testing
+        builder.UseSetting("Pix:PermitirSimulacao", "true");
         builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<IHostedService>();
@@ -130,8 +137,8 @@ public class PdvApiFactory : WebApplicationFactory<Program>
 /// </summary>
 public sealed class PdvApiFactoryPersonalizada : PdvApiFactory
 {
-    public PdvApiFactoryPersonalizada(string dataDir, bool apagarAoDescartar, string? contentRoot = null)
-        : base(dataDir, apagarAoDescartar, contentRoot) { }
+    public PdvApiFactoryPersonalizada(string dataDir, bool apagarAoDescartar, string? contentRoot = null, string ambiente = "Testing")
+        : base(dataDir, apagarAoDescartar, contentRoot, ambiente) { }
 }
 
 [CollectionDefinition(Nome)]
@@ -148,4 +155,11 @@ public class ApiCollection : ICollectionFixture<PdvApiFactory>
 public class CaixaCollection : ICollectionFixture<PdvApiFactory>
 {
     public const string Nome = "API PDV - Caixa";
+}
+
+/// <summary>Coleção com banco temporário próprio para os testes de cobranças Pix.</summary>
+[CollectionDefinition(Nome)]
+public class PixCollection : ICollectionFixture<PdvApiFactory>
+{
+    public const string Nome = "API PDV - Pix";
 }

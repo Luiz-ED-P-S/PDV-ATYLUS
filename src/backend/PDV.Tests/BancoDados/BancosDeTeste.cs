@@ -18,6 +18,16 @@ public static class BancosDeTeste
     public const string Venda1 = "33333333-3333-3333-3333-333333333333";
     public const string Venda2 = "44444444-4444-4444-4444-444444444444";
 
+    /// <summary>Todas as migrations desta build, em ordem (a última é a versão de destino).</summary>
+    public static readonly IReadOnlyList<string> TodasMigracoes = CarregarMigracoes();
+    public static string Ultima => TodasMigracoes[^1];
+
+    private static IReadOnlyList<string> CarregarMigracoes()
+    {
+        using var ctx = new PdvDbContext(new DbContextOptionsBuilder<PdvDbContext>().UseSqlite("Data Source=:memory:").Options);
+        return ctx.Database.GetMigrations().ToList();
+    }
+
     public static string Ddl(string geracao)
     {
         using var recurso = typeof(BancosDeTeste).Assembly.GetManifestResourceStream($"PDV.Tests.BancoDados.Esquemas.{geracao}.sql")

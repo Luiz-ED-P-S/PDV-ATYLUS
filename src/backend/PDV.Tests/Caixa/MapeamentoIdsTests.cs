@@ -33,7 +33,7 @@ public class MapeamentoIdsTests : IDisposable
         using var ctx = NovoContexto();
         var entidades = ctx.Model.GetEntityTypes().Where(t => typeof(BaseEntity).IsAssignableFrom(t.ClrType)).ToList();
 
-        Assert.Equal(8, entidades.Count);
+        Assert.Equal(9, entidades.Count); // 8 originais + CobrancaPix
         Assert.All(entidades, t => Assert.Equal(ValueGenerated.Never, t.FindPrimaryKey()!.Properties.Single().ValueGenerated));
     }
 

@@ -29,7 +29,7 @@ public class AutorizacaoMigracaoTests : IDisposable
         var resultado = Migrar(caminho);
 
         Assert.True(resultado.HouveAlteracao);
-        Assert.Equal(new[] { Inicial, Sincronizacao }, Historico(caminho));
+        Assert.Equal(TodasMigracoes, Historico(caminho));
     }
 
     [Theory]
@@ -47,7 +47,7 @@ public class AutorizacaoMigracaoTests : IDisposable
         Assert.Equal(EtapaMigracao.Autorizacao, erro.Etapa);
         Assert.Contains("precisa ser ATUALIZADO", erro.Message);
         Assert.Contains("Nenhuma alteração foi feita", erro.Message);
-        Assert.Contains($"--atualizar-banco --banco \"{caminho}\" --destino {Sincronizacao} --confirmar", erro.Message);
+        Assert.Contains($"--atualizar-banco --banco \"{caminho}\" --destino {Ultima} --confirmar", erro.Message);
         SqliteConnection.ClearAllPools();
         Assert.Equal(hash, Hash(caminho));
         Assert.Equal(dados, Retrato(caminho));
@@ -72,7 +72,7 @@ public class AutorizacaoMigracaoTests : IDisposable
         Assert.Equal(hash, Hash(caminho));
 
         var autorizado = MigrarAutorizado(caminho);
-        Assert.Equal(new[] { Sincronizacao }, autorizado.Aplicadas);
+        Assert.Equal(TodasMigracoes.Skip(1), autorizado.Aplicadas);
         Assert.Single(Linhas(caminho, "Operadores", new[] { "Matricula" }));
     }
 
@@ -149,8 +149,8 @@ public class AutorizacaoMigracaoTests : IDisposable
 
         Assert.Equal(2, codigo);
         Assert.Contains($"Banco: {caminho}", saida.ToString());
-        Assert.Contains($"Versão de destino desta build: {Sincronizacao}", saida.ToString());
-        Assert.Contains($"--atualizar-banco --banco \"{caminho}\" --destino {Sincronizacao} --confirmar", saida.ToString());
+        Assert.Contains($"Versão de destino desta build: {Ultima}", saida.ToString());
+        Assert.Contains($"--atualizar-banco --banco \"{caminho}\" --destino {Ultima} --confirmar", saida.ToString());
         SqliteConnection.ClearAllPools();
         Assert.Equal(hash, Hash(caminho));
     }
@@ -165,12 +165,12 @@ public class AutorizacaoMigracaoTests : IDisposable
         int codigo;
         using (var ctx = Contexto(caminho))
             codigo = ComandoAtualizarBanco.Executar(
-                new[] { "--atualizar-banco", "--banco", caminho, "--destino", Sincronizacao, "--confirmar" }, Migrador(ctx), saida);
+                new[] { "--atualizar-banco", "--banco", caminho, "--destino", Ultima, "--confirmar" }, Migrador(ctx), saida);
 
         Assert.Equal(0, codigo);
         Assert.Contains("Banco atualizado com sucesso", saida.ToString());
         Assert.Contains("Backup validado", saida.ToString());
-        Assert.Equal(new[] { Inicial, Sincronizacao }, Historico(caminho));
+        Assert.Equal(TodasMigracoes, Historico(caminho));
         Assert.Single(BancosDeTeste.Backups(pasta));
     }
 
@@ -185,7 +185,7 @@ public class AutorizacaoMigracaoTests : IDisposable
         int codigo;
         using (var ctx = Contexto(caminho))
             codigo = ComandoAtualizarBanco.Executar(
-                new[] { "--atualizar-banco", "--banco", caminho, "--destino", Sincronizacao, "--confirmar" }, Migrador(ctx), saida);
+                new[] { "--atualizar-banco", "--banco", caminho, "--destino", Ultima, "--confirmar" }, Migrador(ctx), saida);
 
         Assert.Equal(1, codigo);
         Assert.Contains("Coluna não reconhecida: Produtos.Marca", saida.ToString());

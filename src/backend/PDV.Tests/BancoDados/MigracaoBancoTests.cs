@@ -30,7 +30,7 @@ public class MigracaoBancoTests : IDisposable
         Assert.Equal(SituacaoBanco.Novo, resultado.Antes.Situacao);
         Assert.True(resultado.HouveAlteracao);
         Assert.Null(resultado.Backup);                                   // nada a preservar
-        Assert.Equal(new[] { Inicial, Sincronizacao }, Historico(caminho));
+        Assert.Equal(TodasMigracoes, Historico(caminho));
 
         var real = LerEsquema(caminho);
         var modelo = EsquemaDoModeloAtual();
@@ -66,8 +66,8 @@ public class MigracaoBancoTests : IDisposable
 
         Assert.Equal(SituacaoBanco.LegadoReconhecido, resultado.Antes.Situacao);
         Assert.Equal(Inicial, resultado.Antes.GeracaoLegada);
-        Assert.Equal(new[] { Sincronizacao }, resultado.Aplicadas);
-        Assert.Equal(new[] { Inicial, Sincronizacao }, Historico(caminho));
+        Assert.Equal(TodasMigracoes.Skip(1), resultado.Aplicadas);
+        Assert.Equal(TodasMigracoes, Historico(caminho));
         Assert.Empty(EsquemaDoModeloAtual().DiferencasEm(LerEsquema(caminho)));
 
         // Produtos, operadores (com hash do PIN), caixas, movimentações, vendas, itens e pagamentos: idênticos
@@ -77,6 +77,12 @@ public class MigracaoBancoTests : IDisposable
             Assert.Equal(linhas, Linhas(caminho, tabela, colunasOriginais));
         }
         Assert.Equal(new[] { "CX01|1", "CX01|1" }, Linhas(caminho, "Vendas", new[] { "TerminalId", "NumeroSequencial" }));
+
+        // Pagamento Pix antigo intacto (sem cobrança vinculada) e a nova tabela CobrancasPix criada vazia
+        Assert.Contains(Linhas(caminho, "PagamentosVenda", new[] { "FormaPagamento", "Valor", "TxId" }), l => l == "2|25.90|PIX-LEGADO-0001");
+        Assert.Empty(Linhas(caminho, "CobrancasPix", new[] { "TxId" }));
+        var cobrancas = LerEsquema(caminho).Tabelas["CobrancasPix"];
+        Assert.Contains(cobrancas.Indices, i => i.Nome == "IX_CobrancasPix_TxId" && i.Unico);
 
         // Backup criado antes da alteração, íntegro e com o estado original
         var backup = Assert.Single(BancosDeTeste.Backups(pasta));
@@ -97,14 +103,16 @@ public class MigracaoBancoTests : IDisposable
 
         Assert.Equal(SituacaoBanco.LegadoReconhecido, resultado.Antes.Situacao);
         Assert.Equal(Sincronizacao, resultado.Antes.GeracaoLegada);
-        Assert.Empty(resultado.Aplicadas);
+        Assert.Equal(TodasMigracoes.Skip(2), resultado.Aplicadas);                     // só migrations posteriores a G2 (ex.: CobrancasPix)
         Assert.Equal(new[] { "Users" }, resultado.Antes.TabelasExtras);
-        Assert.Equal(new[] { Inicial, Sincronizacao }, Historico(caminho));
+        Assert.Equal(TodasMigracoes, Historico(caminho));
 
         var esquemaDepois = LerEsquema(caminho);
-        Assert.Empty(esquemaAntes.DiferencasEm(esquemaDepois));                        // nenhuma tabela/coluna/índice alterado
-        Assert.Equal(esquemaAntes.TabelasDeDados, esquemaDepois.TabelasDeDados);       // Users preservada
-        Assert.Equal(dadosAntes, Retrato(caminho));                                    // todos os dados, inclusive Users
+        Assert.Empty(esquemaAntes.DiferencasEm(esquemaDepois));                        // nenhuma tabela existente alterada
+        Assert.Empty(esquemaAntes.TabelasDeDados.Except(esquemaDepois.TabelasDeDados)); // Users preservada
+        var dadosDepois = Retrato(caminho);
+        foreach (var (tabela, linhas) in dadosAntes)
+            Assert.Equal(linhas, dadosDepois[tabela]);                                 // todos os dados, inclusive Users
         Assert.Single(BancosDeTeste.Backups(pasta));
     }
 
@@ -129,7 +137,7 @@ public class MigracaoBancoTests : IDisposable
         Assert.Single(BancosDeTeste.Backups(pasta));
         Assert.Equal(dados, Retrato(caminho));
         Assert.True(esquema.Igual(LerEsquema(caminho)));
-        Assert.Equal(new[] { Inicial, Sincronizacao }, Historico(caminho));
+        Assert.Equal(TodasMigracoes, Historico(caminho));
     }
 
     [Fact]
@@ -142,7 +150,7 @@ public class MigracaoBancoTests : IDisposable
         var diagnostico = Diagnosticar(caminho);
 
         Assert.Equal(SituacaoBanco.LegadoReconhecido, diagnostico.Situacao);
-        Assert.Equal(new[] { Sincronizacao }, diagnostico.MigracoesPendentes);
+        Assert.Equal(TodasMigracoes.Skip(1), diagnostico.MigracoesPendentes);
         Assert.Contains("LegadoReconhecido", diagnostico.Relatorio());
         SqliteConnection.ClearAllPools();
         Assert.Equal(hash, Hash(caminho));
@@ -250,8 +258,8 @@ public class MigracaoBancoTests : IDisposable
         var retomada = MigrarAutorizado(caminho);
 
         Assert.Equal(SituacaoBanco.Gerenciado, retomada.Antes.Situacao);
-        Assert.Equal(new[] { Sincronizacao }, retomada.Aplicadas);
-        Assert.Equal(new[] { Inicial, Sincronizacao }, Historico(caminho));
+        Assert.Equal(TodasMigracoes.Skip(1), retomada.Aplicadas);
+        Assert.Equal(TodasMigracoes, Historico(caminho));
         Assert.Empty(EsquemaDoModeloAtual().DiferencasEm(LerEsquema(caminho)));
     }
 
@@ -322,7 +330,7 @@ public class MigracaoBancoTests : IDisposable
         Assert.Single(resultados, r => r.HouveAlteracao);
         Assert.Single(resultados, r => !r.HouveAlteracao);
         Assert.Single(BancosDeTeste.Backups(pasta));
-        Assert.Equal(new[] { Inicial, Sincronizacao }, Historico(caminho));
+        Assert.Equal(TodasMigracoes, Historico(caminho));
     }
 
     // ---------- utilitários ----------
