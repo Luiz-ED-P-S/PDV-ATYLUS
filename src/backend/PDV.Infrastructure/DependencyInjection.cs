@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using PDV.Domain.Interfaces;
 using PDV.Infrastructure.Context;
+using PDV.Infrastructure.Persistence;
 using PDV.Infrastructure.Repositories;
 using PDV.Infrastructure.Services;
 
@@ -49,6 +50,9 @@ public static class DependencyInjection
         services.AddScoped<IVendaRepository, VendaRepository>();
         services.AddScoped<IOperadorRepository, OperadorRepository>();
         services.AddScoped<ISincronizacaoRepository, SincronizacaoRepository>();
+
+        // Criação/atualização segura do banco por migrations (substitui EnsureCreated)
+        services.AddScoped<MigradorBancoDados>();
 
         // Serviços Externos e de Suporte
         services.AddSingleton<IPixService, PixSimulatorService>();

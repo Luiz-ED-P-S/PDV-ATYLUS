@@ -29,6 +29,9 @@ dist/
 *.sqlite3
 /backups/
 /src/backend/PDV.API/pdv.db*
+# Trava temporária da atualização do banco (removida ao final) e backups locais de migração
+*.migracao.lock
+backups/
 
 # Sensitive Files & API Keys
 credentials.json

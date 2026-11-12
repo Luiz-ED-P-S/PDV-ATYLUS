@@ -11,6 +11,7 @@ using PDV.Domain.Entities;
 using PDV.Domain.Enums;
 using PDV.Infrastructure;
 using PDV.Infrastructure.Context;
+using PDV.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -95,6 +96,18 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// Modo de diagnóstico: "PDV.API --verificar-banco" mostra a situação do banco e as migrations pendentes,
+// sem alterar nada (não cria chave, não aplica migrations, não sobe o servidor).
+if (args.Contains("--verificar-banco"))
+{
+    using var escopoDiagnostico = app.Services.CreateScope();
+    Console.OutputEncoding = System.Text.Encoding.UTF8;
+    var diagnostico = escopoDiagnostico.ServiceProvider.GetRequiredService<MigradorBancoDados>().Diagnosticar();
+    Console.WriteLine(diagnostico.Relatorio());
+    Environment.ExitCode = diagnostico.Situacao == SituacaoBanco.Incompativel ? 1 : 0;
+    return;
+}
+
 // Carrega a chave de autenticação ANTES de tocar no banco: sem chave confiável a API não inicia (falha segura)
 try
 {
@@ -110,7 +123,18 @@ catch (ChaveJwtException ex)
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<PdvDbContext>();
-    context.Database.EnsureCreated();
+
+    // Cria (banco novo) ou atualiza (banco existente, com backup validado) pelas migrations do EF Core.
+    // Bancos criados pelo antigo EnsureCreated() são reconhecidos e recebem baseline sem recriar tabelas.
+    try
+    {
+        scope.ServiceProvider.GetRequiredService<MigradorBancoDados>().Executar();
+    }
+    catch (MigracaoBancoException ex)
+    {
+        app.Logger.LogCritical("Falha na preparação do banco de dados ({Etapa}): {Mensagem}", ex.Etapa, ex.Message);
+        throw;
+    }
 
     try
     {
