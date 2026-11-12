@@ -32,7 +32,7 @@ export const Header: React.FC<HeaderProps> = ({
   onNavegarPara,
   onPesquisar,
 }) => {
-  const { operador, logout, trocarOperador, atualizarPerfil } = useAuthStore();
+  const { operador, logout, trocarOperador, atualizarPerfil, alterarPin, usaPinPadrao } = useAuthStore();
   const { theme } = useThemeStore();
   const { caixa } = useCashierStore();
 
@@ -46,21 +46,27 @@ export const Header: React.FC<HeaderProps> = ({
   // Edição de Perfil
   const [nomePerfil, setNomePerfil] = useState(operador.nome);
   const [emailPerfil, setEmailPerfil] = useState(operador.email || '');
-  const [cargoPerfil, setCargoPerfil] = useState<'Operador' | 'Supervisor'>(operador.role);
   const [avatarPreview, setAvatarPreview] = useState(operador.avatarUrl || '');
   const [feedbackPerfil, setFeedbackPerfil] = useState<string | null>(null);
+
+  // Alteração do próprio PIN (validado no backend)
+  const [pinAtualInput, setPinAtualInput] = useState('');
+  const [novoPinInput, setNovoPinInput] = useState('');
+  const [confirmarPinInput, setConfirmarPinInput] = useState('');
+  const [mensagemPin, setMensagemPin] = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null);
+  const [salvandoPin, setSalvandoPin] = useState(false);
 
   // Troca de Operador por PIN
   const [matriculaInput, setMatriculaInput] = useState('');
   const [pinInput, setPinInput] = useState('');
   const [erroOperador, setErroOperador] = useState<string | null>(null);
+  const [trocandoOperador, setTrocandoOperador] = useState(false);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setNomePerfil(operador.nome);
     setEmailPerfil(operador.email || '');
-    setCargoPerfil(operador.role);
     setAvatarPreview(operador.avatarUrl || '');
   }, [operador]);
 
@@ -79,19 +85,48 @@ export const Header: React.FC<HeaderProps> = ({
     if (onPesquisar) onPesquisar(busca);
   };
 
-  const handleTrocarOperador = (e: React.FormEvent) => {
+  const handleTrocarOperador = async (e: React.FormEvent) => {
     e.preventDefault();
     setErroOperador(null);
-    const sucesso = trocarOperador(matriculaInput.toUpperCase(), pinInput);
+    setTrocandoOperador(true);
+    const sucesso = await trocarOperador(matriculaInput.toUpperCase(), pinInput);
+    setTrocandoOperador(false);
+    setPinInput('');
     if (sucesso) {
       setModalOperadorAberto(false);
       setMatriculaInput('');
-      setPinInput('');
       setMenuAberto(false);
       sound.playSuccessChime();
     } else {
-      setErroOperador('PIN inválido! Digite 0000 para Operador ou 1234 para Supervisor.');
+      setErroOperador('Matrícula ou PIN inválidos.');
       sound.playErrorBeep();
+    }
+  };
+
+  const handleAlterarPin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMensagemPin(null);
+    if (!/^\d{4,}$/.test(novoPinInput)) {
+      setMensagemPin({ tipo: 'erro', texto: 'O novo PIN deve ter no mínimo 4 dígitos numéricos.' });
+      return;
+    }
+    if (novoPinInput !== confirmarPinInput) {
+      setMensagemPin({ tipo: 'erro', texto: 'A confirmação não confere com o novo PIN.' });
+      return;
+    }
+    setSalvandoPin(true);
+    try {
+      await alterarPin(pinAtualInput, novoPinInput);
+      setMensagemPin({ tipo: 'ok', texto: 'PIN alterado com sucesso!' });
+      sound.playSuccessChime();
+    } catch (err: any) {
+      setMensagemPin({ tipo: 'erro', texto: err?.message || 'Não foi possível alterar o PIN.' });
+      sound.playErrorBeep();
+    } finally {
+      setSalvandoPin(false);
+      setPinAtualInput('');
+      setNovoPinInput('');
+      setConfirmarPinInput('');
     }
   };
 
@@ -121,7 +156,6 @@ export const Header: React.FC<HeaderProps> = ({
     atualizarPerfil({
       nome: nomePerfil.trim(),
       email: emailPerfil.trim(),
-      role: cargoPerfil,
       avatarUrl: avatarPreview,
     });
     sound.playSuccessChime();
@@ -445,14 +479,13 @@ export const Header: React.FC<HeaderProps> = ({
 
                 <div>
                   <label className="block text-slate-700 mb-1">Nível de Permissão:</label>
-                  <select
-                    value={cargoPerfil}
-                    onChange={e => setCargoPerfil(e.target.value as 'Operador' | 'Supervisor')}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:bg-white focus:outline-none"
-                  >
-                    <option value="Operador">Operador de Caixa</option>
-                    <option value="Supervisor">Supervisor / Gerente</option>
-                  </select>
+                  {/* Definido pelo cadastro do operador no servidor; não pode ser alterado aqui */}
+                  <input
+                    type="text"
+                    disabled
+                    value={operador.role === 'Supervisor' ? 'Supervisor / Gerente' : 'Operador de Caixa'}
+                    className="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-xl text-slate-500 cursor-not-allowed"
+                  />
                 </div>
               </div>
 
@@ -479,6 +512,69 @@ export const Header: React.FC<HeaderProps> = ({
                   Salvar Perfil
                 </button>
               </div>
+            </form>
+
+            {/* Alterar PIN de acesso */}
+            <form onSubmit={handleAlterarPin} className="pt-4 border-t border-slate-100 space-y-3 text-xs font-semibold">
+              <div className="flex items-center gap-2">
+                <Shield className="w-4 h-4 text-indigo-600" />
+                <span className="font-bold text-slate-800">Alterar PIN de Acesso</span>
+              </div>
+              {usaPinPadrao && (
+                <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-[11px]">
+                  Você entrou com o PIN padrão de fábrica. Defina um novo PIN para proteger sua conta.
+                </div>
+              )}
+              <div className="grid grid-cols-3 gap-2">
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  autoComplete="current-password"
+                  placeholder="PIN atual"
+                  value={pinAtualInput}
+                  onChange={e => setPinAtualInput(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-center font-mono focus:bg-white focus:outline-none"
+                />
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  autoComplete="new-password"
+                  placeholder="Novo PIN"
+                  value={novoPinInput}
+                  onChange={e => setNovoPinInput(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-center font-mono focus:bg-white focus:outline-none"
+                />
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  autoComplete="new-password"
+                  placeholder="Confirmar"
+                  value={confirmarPinInput}
+                  onChange={e => setConfirmarPinInput(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-center font-mono focus:bg-white focus:outline-none"
+                />
+              </div>
+              {mensagemPin && (
+                <div
+                  className={`p-2.5 rounded-xl text-[11px] border ${
+                    mensagemPin.tipo === 'ok'
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                      : 'bg-rose-50 border-rose-200 text-rose-700'
+                  }`}
+                >
+                  {mensagemPin.texto}
+                </div>
+              )}
+              <button
+                type="submit"
+                disabled={salvandoPin}
+                className="w-full py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl disabled:opacity-60"
+              >
+                {salvandoPin ? 'Alterando...' : 'Alterar PIN'}
+              </button>
             </form>
           </div>
         </div>
@@ -516,7 +612,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <input
                   type="password"
                   maxLength={6}
-                  placeholder="0000 para operador ou 1234 supervisor"
+                  placeholder="Digite o PIN"
                   value={pinInput}
                   onChange={e => setPinInput(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-center font-mono text-base tracking-widest focus:bg-white focus:outline-none"
@@ -540,9 +636,10 @@ export const Header: React.FC<HeaderProps> = ({
                 <button
                   type="submit"
                   style={{ backgroundColor: theme.corPrimaria }}
-                  className="flex-1 py-2 hover:opacity-90 text-white font-bold rounded-xl shadow-xs"
+                  disabled={trocandoOperador}
+                  className="flex-1 py-2 hover:opacity-90 text-white font-bold rounded-xl shadow-xs disabled:opacity-60"
                 >
-                  Entrar
+                  {trocandoOperador ? 'Validando...' : 'Entrar'}
                 </button>
               </div>
             </form>

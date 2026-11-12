@@ -6,6 +6,99 @@ const api = axios.create({
   timeout: 5000,
 });
 
+// ===== Autenticação (JWT emitido pelo backend local) =====
+let tokenAtual: string | null = null;
+let aoPerderAutorizacao: (() => void) | null = null;
+
+/** Define o token enviado em todas as requisições (null remove). */
+export const setAuthToken = (token: string | null) => {
+  tokenAtual = token;
+};
+
+/** Cabeçalho Authorization para chamadas feitas com fetch() fora do cliente axios. */
+export const authHeaders = (): Record<string, string> =>
+  tokenAtual ? { Authorization: `Bearer ${tokenAtual}` } : {};
+
+/** Callback chamado quando a API responde 401 (token ausente, expirado ou inválido). */
+export const setOnUnauthorized = (callback: () => void) => {
+  aoPerderAutorizacao = callback;
+};
+
+const ROTAS_AUTH_SEM_LOGOUT = ['/auth/login', '/auth/autorizar-supervisor', '/auth/alterar-pin'];
+
+api.interceptors.request.use(config => {
+  if (tokenAtual) {
+    config.headers = config.headers ?? {};
+    config.headers.Authorization = `Bearer ${tokenAtual}`;
+  }
+  return config;
+});
+
+api.interceptors.response.use(
+  resposta => resposta,
+  erro => {
+    const status = erro.response?.status;
+    const url: string = erro.config?.url ?? '';
+    const rotaDeAuth = ROTAS_AUTH_SEM_LOGOUT.some(rota => url.startsWith(rota));
+
+    if (status === 401 && !rotaDeAuth) {
+      aoPerderAutorizacao?.();
+    } else if (status === 403) {
+      const mensagem = 'Ação permitida apenas para Supervisor.';
+      erro.message = mensagem;
+      if (erro.response) {
+        erro.response.data = { ...(erro.response.data || {}), message: mensagem, mensagem };
+      }
+    }
+    return Promise.reject(erro);
+  }
+);
+
+export interface OperadorLoginResposta {
+  id: string;
+  nome: string;
+  matricula: string;
+  perfil: 'Operador' | 'Supervisor';
+  usaPinPadrao: boolean;
+}
+
+export interface LoginResposta {
+  token: string;
+  expiraEm: string;
+  operador: OperadorLoginResposta;
+}
+
+const mensagemDeErro = (err: any, padrao: string): string =>
+  err?.response?.data?.mensagem || err?.response?.data?.message || padrao;
+
+export const authApi = {
+  async login(matricula: string, pin: string): Promise<LoginResposta> {
+    try {
+      const res = await api.post<LoginResposta>('/auth/login', { matricula, pin });
+      return res.data;
+    } catch (err: any) {
+      if (!err.response) throw new Error('Servidor do PDV indisponível. Verifique se o sistema está em execução.');
+      throw new Error(mensagemDeErro(err, 'Matrícula ou PIN inválidos.'));
+    }
+  },
+
+  async autorizarSupervisor(pin: string): Promise<void> {
+    try {
+      await api.post('/auth/autorizar-supervisor', { pin });
+    } catch (err: any) {
+      throw new Error(mensagemDeErro(err, 'PIN de supervisor inválido.'));
+    }
+  },
+
+  async alterarPin(pinAtual: string, novoPin: string): Promise<void> {
+    try {
+      await api.post('/auth/alterar-pin', { pinAtual, novoPin });
+    } catch (err: any) {
+      throw new Error(mensagemDeErro(err, 'Não foi possível alterar o PIN.'));
+    }
+  },
+};
+
 export const pdvApi = {
   async buscarProdutos(termo?: string): Promise<Produto[]> {
     const res = await api.get<Produto[]>('/produtos', { params: { termo } });

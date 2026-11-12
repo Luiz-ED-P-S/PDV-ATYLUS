@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { UserRound, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { useAuthStore } from '../../store/useAuthStore';
 
 interface LoginViewProps {
@@ -7,8 +7,8 @@ interface LoginViewProps {
 }
 
 export const LoginView: React.FC<LoginViewProps> = ({ onSuccess }) => {
-  const [email, setEmail] = useState('contato@atyluspdv.com');
-  const [senha, setSenha] = useState('••••••••');
+  const [matricula, setMatricula] = useState('');
+  const [pin, setPin] = useState('');
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -21,20 +21,19 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSuccess }) => {
     setCarregando(true);
 
     try {
-      await login(email, senha);
+      await login(matricula, pin);
+      setPin('');
       if (onSuccess) onSuccess();
-    } catch {
-      setErro('Credenciais inválidas. Verifique seu e-mail e senha.');
+    } catch (err: any) {
+      setErro(err?.message || 'Matrícula ou PIN inválidos.');
     } finally {
       setCarregando(false);
     }
   };
 
-  const handleSocialLogin = async (provedor: string) => {
-    setCarregando(true);
-    await login(`usuario.${provedor.toLowerCase()}@atyluspdv.com`, '1234');
-    setCarregando(false);
-    if (onSuccess) onSuccess();
+  // Login social exigiria internet e um provedor externo; o PDV autentica somente offline por matrícula + PIN
+  const handleSocialLogin = (provedor: string) => {
+    setErro(`Login com ${provedor} indisponível no modo offline. Entre com sua matrícula e PIN.`);
   };
 
   return (
@@ -208,24 +207,26 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSuccess }) => {
             {/* Formulário de Acesso */}
             <form onSubmit={handleSubmit} className="mt-8 space-y-4">
               
-              {/* Campo E-mail */}
+              {/* Campo Matrícula */}
               <div>
                 <div className="relative flex items-center">
                   <div className="absolute left-4 text-slate-400 pointer-events-none">
-                    <Mail className="w-5 h-5" />
+                    <UserRound className="w-5 h-5" />
                   </div>
                   <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    type="text"
+                    value={matricula}
+                    onChange={(e) => setMatricula(e.target.value.toUpperCase())}
                     required
-                    placeholder="E-mail"
+                    autoFocus
+                    autoComplete="username"
+                    placeholder="Matrícula"
                     className="w-full pl-12 pr-4 py-3.5 bg-[#f8fafc] border border-slate-200/90 rounded-2xl text-slate-900 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#005bf8]/20 focus:border-[#005bf8] focus:bg-white transition-all duration-150"
                   />
                 </div>
               </div>
 
-              {/* Campo Senha */}
+              {/* Campo PIN */}
               <div>
                 <div className="relative flex items-center">
                   <div className="absolute left-4 text-slate-400 pointer-events-none">
@@ -233,10 +234,12 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSuccess }) => {
                   </div>
                   <input
                     type={mostrarSenha ? 'text' : 'password'}
-                    value={senha}
-                    onChange={(e) => setSenha(e.target.value)}
+                    value={pin}
+                    onChange={(e) => setPin(e.target.value)}
                     required
-                    placeholder="Senha"
+                    inputMode="numeric"
+                    autoComplete="current-password"
+                    placeholder="PIN"
                     className="w-full pl-12 pr-12 py-3.5 bg-[#f8fafc] border border-slate-200/90 rounded-2xl text-slate-900 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#005bf8]/20 focus:border-[#005bf8] focus:bg-white transition-all duration-150"
                   />
                   <button
@@ -252,10 +255,10 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSuccess }) => {
                 <div className="flex justify-end mt-2">
                   <button
                     type="button"
-                    onClick={() => alert('Para redefinir sua senha, solicite ao Supervisor ou utilize a matrícula padrão.')}
+                    onClick={() => alert('Para redefinir seu PIN, solicite ao Supervisor.')}
                     className="text-xs font-semibold text-[#005bf8] hover:text-[#0047db] transition-colors"
                   >
-                    Esqueceu sua senha?
+                    Esqueceu seu PIN?
                   </button>
                 </div>
               </div>
