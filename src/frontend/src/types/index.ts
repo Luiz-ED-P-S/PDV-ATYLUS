@@ -33,6 +33,8 @@ export interface PagamentoItem {
   valor: number;
   troco?: number;
   txId?: string;
+  /** Pix confirmado manualmente por Supervisor (não é confirmação bancária). */
+  confirmacaoManual?: string;
 }
 
 export interface MovimentacaoCaixa {
@@ -99,12 +101,36 @@ export interface AbaAtendimento {
   criadaEm: string;
 }
 
-export interface PixGenerateResult {
+export type StatusCobrancaPix = 'Pendente' | 'Confirmada' | 'Utilizada' | 'Expirada';
+
+/** Cobrança Pix persistida no backend. Só o backend decide quando ela está confirmada. */
+export interface CobrancaPix {
   txId: string;
-  qrCodeBase64: string;
-  copiaECola: string;
   valor: number;
+  status: StatusCobrancaPix;
+  provedor: string;
+  /** true apenas para QR Code de cobrança bancária real (provedor Pix integrado). */
+  cobrancaBancaria: boolean;
+  /** true quando gerada pelo simulador (somente desenvolvimento/testes). */
+  simulada: boolean;
   expiraEm: string;
+  qrCodeBase64?: string | null;
+  copiaECola?: string | null;
+  instrucoes?: string | null;
+  metodoConfirmacao?: 'Simulacao' | 'ManualSupervisor' | 'Provedor' | null;
+  confirmadoEm?: string | null;
+  supervisorMatricula?: string | null;
+  confirmacaoManual: boolean;
+}
+
+/** @deprecated mantido por compatibilidade: use CobrancaPix */
+export type PixGenerateResult = CobrancaPix;
+
+export interface RecursosSistema {
+  pixSimulacaoHabilitada: boolean;
+  pixProvedor: string;
+  pixCobrancaBancaria: boolean;
+  confirmacaoManualPix: boolean;
 }
 
 export interface MapeamentoColunas {

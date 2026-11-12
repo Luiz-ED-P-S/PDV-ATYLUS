@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Caixa, MovimentacaoCaixa, PixGenerateResult, Produto, ResultadoSincronizacao, StatusSincronizacao, Venda } from '../types';
+import { Caixa, CobrancaPix, MovimentacaoCaixa, Produto, RecursosSistema, ResultadoSincronizacao, StatusSincronizacao, Venda } from '../types';
 
 const api = axios.create({
   baseURL: '/api/v1',
@@ -243,18 +243,37 @@ export const pdvApi = {
     await api.post('/sync/config', config);
   },
 
-  async gerarPix(valor: number, descricao: string): Promise<PixGenerateResult> {
-    const res = await api.post<PixGenerateResult>('/payments/pix/generate', { valor, descricao });
+  /** Recursos habilitados no servidor (ex.: simulação de Pix). Somente leitura. */
+  async obterRecursos(): Promise<RecursosSistema> {
+    const res = await api.get<RecursosSistema>('/sistema/recursos');
     return res.data;
   },
 
-  async consultarPix(txid: string): Promise<{ txId: string; pago: boolean; valor: number }> {
-    const res = await api.get(`/payments/pix/status/${txid}`);
+  /** Gera uma cobrança Pix persistida no backend. */
+  async gerarPix(valor: number, descricao: string): Promise<CobrancaPix> {
+    const res = await api.post<CobrancaPix>('/payments/pix/generate', { valor, descricao });
     return res.data;
   },
 
-  async simularPagamentoPix(txid: string): Promise<void> {
-    await api.post(`/payments/pix/simulate-payment/${txid}`);
+  async consultarPix(txid: string): Promise<CobrancaPix> {
+    const res = await api.get<CobrancaPix>(`/payments/pix/status/${txid}`);
+    return res.data;
+  },
+
+  /** Somente quando o servidor habilitar a simulação (desenvolvimento/testes). */
+  async simularPagamentoPix(txid: string): Promise<CobrancaPix> {
+    const res = await api.post<CobrancaPix>(`/payments/pix/simulate-payment/${txid}`);
+    return res.data;
+  },
+
+  /** Confirmação manual do recebimento por Supervisor (validada no backend; não é confirmação bancária). */
+  async confirmarPixManual(txid: string, supervisorMatricula: string, supervisorPin: string, observacao?: string): Promise<CobrancaPix> {
+    try {
+      const res = await api.post<CobrancaPix>(`/payments/pix/${txid}/confirmar-manual`, { supervisorMatricula, supervisorPin, observacao });
+      return res.data;
+    } catch (err: any) {
+      throw new Error(err?.response?.data?.mensagem || err?.response?.data?.message || 'Não foi possível confirmar o Pix.');
+    }
   },
 
   // Periféricos: Impressão Térmica ESC/POS & Gaveta
