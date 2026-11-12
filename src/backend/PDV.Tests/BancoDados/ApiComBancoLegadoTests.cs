@@ -7,18 +7,35 @@ using static PDV.Tests.BancoDados.BancosDeTeste;
 namespace PDV.Tests.BancoDados;
 
 /// <summary>
-/// Inicializa a API real sobre um banco G1 TEMPORÁRIO (como os criados até 03/11 por EnsureCreated):
-/// a própria inicialização atualiza o banco e o PDV continua operando com os dados antigos.
+/// API real sobre bancos TEMPORÁRIOS: um banco G1 (criado até 03/11 por EnsureCreated) impede a operação
+/// do PDV até ser atualizado com autorização explícita; depois disso a inicialização normal funciona.
 /// </summary>
 public class ApiComBancoLegadoTests : IDisposable
 {
     private readonly string _pasta = Path.Combine(Path.GetTempPath(), "pdv-api-legado-" + Guid.NewGuid().ToString("N"));
 
     [Fact]
-    public async Task BancoG1_EAtualizadoNaInicializacao_EContinuaCompativel()
+    public async Task BancoG1_BloqueiaOPdvAteAutorizacao_EDepoisContinuaCompativel()
     {
         var caminho = CriarLegado(_pasta, "G1");
+        var hash = Hash(caminho);
 
+        // 1) Inicialização normal: o PDV não opera e o banco não é alterado
+        using (var bloqueada = new PdvApiFactoryPersonalizada(_pasta, apagarAoDescartar: false))
+        {
+            var erro = Record.Exception(() => bloqueada.CreateClient());
+            Assert.NotNull(erro);
+            Assert.Contains("precisa ser ATUALIZADO", TodasAsMensagens(erro!));
+        }
+        SqliteConnection.ClearAllPools();
+        Assert.Equal(hash, Hash(caminho));
+        Assert.Empty(Historico(caminho));
+        Assert.Empty(BancosDeTeste.Backups(_pasta));
+
+        // 2) Atualização autorizada pelo administrador (equivale a --atualizar-banco ... --confirmar)
+        Assert.True(MigrarAutorizado(caminho).HouveAlteracao);
+
+        // 3) Inicialização normal volta a funcionar com os dados antigos
         using var factory = new PdvApiFactoryPersonalizada(_pasta, apagarAoDescartar: false);
         var token = await factory.ObterTokenAsync("OP01", "0000");           // operador e PIN (hash) antigos
         using var api = factory.CriarClienteAutenticado(token);
@@ -49,6 +66,36 @@ public class ApiComBancoLegadoTests : IDisposable
         SqliteConnection.ClearAllPools();
         Assert.Equal(2, Historico(caminho).Count);
         Assert.Single(BancosDeTeste.Backups(_pasta));
+    }
+
+    [Fact]
+    public void BancoIncompativel_ImpedeOperacao_SemModificarDados()
+    {
+        var caminho = CriarLegado(_pasta, "G1", ajuste: c => Sql(c, "ALTER TABLE \"Produtos\" DROP COLUMN \"EstoqueMinimo\";"));
+        var hash = Hash(caminho);
+
+        using (var factory = new PdvApiFactoryPersonalizada(_pasta, apagarAoDescartar: false))
+        {
+            var erro = Record.Exception(() => factory.CreateClient());
+            Assert.NotNull(erro);
+            Assert.Contains("Coluna ausente: Produtos.EstoqueMinimo", TodasAsMensagens(erro!));
+        }
+
+        SqliteConnection.ClearAllPools();
+        Assert.Equal(hash, Hash(caminho));
+        Assert.Empty(BancosDeTeste.Backups(_pasta));
+    }
+
+    private static string TodasAsMensagens(Exception ex)
+    {
+        var mensagens = new List<string>();
+        for (var atual = ex; atual != null; atual = atual.InnerException)
+        {
+            mensagens.Add(atual.Message);
+            if (atual is AggregateException agregada)
+                mensagens.AddRange(agregada.InnerExceptions.Select(TodasAsMensagens));
+        }
+        return string.Join(" | ", mensagens);
     }
 
     private record VendaBody(Guid Id, decimal ValorLiquido, string Status);

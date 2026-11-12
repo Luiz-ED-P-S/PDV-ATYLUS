@@ -104,14 +104,23 @@ public static class BancosDeTeste
     public static PdvDbContext Contexto(string caminho) =>
         new(new DbContextOptionsBuilder<PdvDbContext>().UseSqlite($"Data Source={caminho}").Options);
 
-    public static MigradorBancoDados Migrador(PdvDbContext contexto, TimeSpan? esperaTrava = null) =>
-        new(contexto, NullLogger<MigradorBancoDados>.Instance, new OpcoesMigracaoBanco { EsperaTrava = esperaTrava ?? TimeSpan.FromSeconds(5) });
+    public static MigradorBancoDados Migrador(PdvDbContext contexto, TimeSpan? esperaTrava = null, bool atualizacaoAutomatica = false) =>
+        new(contexto, NullLogger<MigradorBancoDados>.Instance,
+            new OpcoesMigracaoBanco { EsperaTrava = esperaTrava ?? TimeSpan.FromSeconds(5), AtualizacaoAutomatica = atualizacaoAutomatica });
 
-    /// <summary>Executa a migração com um contexto próprio, como uma inicialização do PDV.</summary>
+    /// <summary>Inicialização NORMAL do PDV (sem autorização): só cria bancos novos; bancos existentes não são alterados.</summary>
     public static ResultadoMigracao Migrar(string caminho, TimeSpan? esperaTrava = null)
     {
         using var ctx = Contexto(caminho);
         return Migrador(ctx, esperaTrava).Executar();
+    }
+
+    /// <summary>Atualização AUTORIZADA (equivalente ao comando --atualizar-banco --confirmar): arquivo e versão confirmados.</summary>
+    public static ResultadoMigracao MigrarAutorizado(string caminho, TimeSpan? esperaTrava = null)
+    {
+        using var ctx = Contexto(caminho);
+        var migrador = Migrador(ctx, esperaTrava);
+        return migrador.Executar(new AutorizacaoMigracao(caminho, migrador.UltimaMigracao));
     }
 
     public static DiagnosticoBanco Diagnosticar(string caminho)

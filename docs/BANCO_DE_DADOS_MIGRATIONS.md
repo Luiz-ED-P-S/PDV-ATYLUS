@@ -14,9 +14,46 @@ tabelas/colunas exigidas pelo código novo.
 O primeiro commit (`8120d81`) não compilava e nunca gerou bancos. O DDL exato de G1 e G2 está em
 `src/backend/PDV.Tests/BancoDados/Esquemas/` e os testes garantem que as migrations reproduzem cada geração.
 
-## O que acontece na inicialização
+## Política: bancos existentes só mudam com autorização explícita
 
-O serviço `MigradorBancoDados` (`PDV.Infrastructure/Persistence`) roda antes de qualquer acesso ao banco:
+| Situação do banco | Inicialização normal do PDV |
+|---|---|
+| Novo (arquivo inexistente ou vazio) | Criado pelas migrations normalmente. |
+| Gerenciado e atualizado | Inicia normalmente, sem nenhuma escrita. |
+| Existente que precisa de atualização (legado G1/G2 sem histórico, ou migration pendente) | **Não é alterado.** O PDV não inicia e mostra a mensagem *"O banco de dados … precisa ser ATUALIZADO"* com o comando de autorização. |
+| Incompatível | **Não é alterado.** O PDV não inicia e lista as diferenças. |
+
+A atualização de um banco existente (inclusive o simples registro de baseline de um banco G2) acontece **somente** pelo
+comando administrativo abaixo, que exige confirmar o arquivo e a versão de destino.
+
+A opção `Banco:AtualizacaoAutomatica` (padrão `false`) está reservada para versões comerciais futuras que queiram
+atualizar na inicialização; ela **não está habilitada** em nenhuma configuração atual.
+
+## Comando administrativo de atualização
+
+1. Encerre o PDV e confira o diagnóstico (nada é alterado):
+
+```bash
+PDV.API.exe --atualizar-banco
+```
+
+   Mostra o banco selecionado, a situação, as alterações pendentes, a versão de destino desta build e o comando exato de confirmação.
+
+2. Autorize, confirmando o arquivo e a versão de destino exibidos:
+
+```bash
+PDV.API.exe --atualizar-banco --banco "C:\caminho\do\pdv.db" --destino 20261112172002_SincronizacaoMultiTerminal --confirmar
+```
+
+   Se o arquivo ou a versão não corresponderem exatamente ao banco configurado e à build, nada é alterado.
+   Códigos de saída: `0` concluído/nada a fazer, `1` falha ou banco incompatível, `2` confirmação necessária.
+
+3. Inicie o PDV normalmente.
+
+## Etapas da atualização
+
+O serviço `MigradorBancoDados` (`PDV.Infrastructure/Persistence`) roda antes de qualquer acesso ao banco
+(na inicialização normal apenas até o diagnóstico, para bancos existentes):
 
 1. **Trava exclusiva** `pdv.db.migracao.lock` (ao lado do banco). Outra instância espera até 60 s e, se a trava não
    for liberada, falha com mensagem clara **sem alterar o banco**.
@@ -37,7 +74,7 @@ O serviço `MigradorBancoDados` (`PDV.Infrastructure/Persistence`) roda antes de
 7. **Validação final**: esquema igual ao das migrations e o conteúdo original de todas as tabelas preservado
    (mesmas linhas e valores nas colunas que já existiam).
 
-Reiniciar o PDV sem migrations pendentes **não grava nada** e não cria backup.
+As etapas 3 a 7 só ocorrem com autorização explícita. Reiniciar o PDV sem migrations pendentes **não grava nada** e não cria backup.
 
 ## Verificar um banco sem alterá-lo
 
@@ -56,7 +93,8 @@ A mensagem informa a etapa e o caminho do backup validado.
 - **Falha na trava, no diagnóstico ou no backup**: o banco **não foi alterado**. Corrija a causa (encerre a outra
   instância, libere espaço, corrija permissões) e inicie novamente.
 - **Falha durante uma migration**: a migration em andamento é desfeita pela transação; as anteriores continuam
-  registradas no histórico. Corrija a causa e inicie novamente — a atualização é **retomada** do ponto em que parou.
+  registradas no histórico. Corrija a causa e execute novamente o comando `--atualizar-banco` — a atualização é
+  **retomada** do ponto em que parou.
 
 ### Restaurar o backup (somente se necessário)
 

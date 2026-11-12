@@ -62,7 +62,7 @@ public class MigracaoBancoTests : IDisposable
         var caminho = CriarLegado(pasta, "G1");
         var antes = Retrato(caminho);
 
-        var resultado = Migrar(caminho);
+        var resultado = MigrarAutorizado(caminho);
 
         Assert.Equal(SituacaoBanco.LegadoReconhecido, resultado.Antes.Situacao);
         Assert.Equal(Inicial, resultado.Antes.GeracaoLegada);
@@ -93,7 +93,7 @@ public class MigracaoBancoTests : IDisposable
         var esquemaAntes = LerEsquema(caminho);
         var dadosAntes = Retrato(caminho);
 
-        var resultado = Migrar(caminho);
+        var resultado = MigrarAutorizado(caminho);
 
         Assert.Equal(SituacaoBanco.LegadoReconhecido, resultado.Antes.Situacao);
         Assert.Equal(Sincronizacao, resultado.Antes.GeracaoLegada);
@@ -115,7 +115,7 @@ public class MigracaoBancoTests : IDisposable
     {
         var pasta = NovaPasta("reinicio");
         var caminho = CriarLegado(pasta, "G1");
-        Migrar(caminho);
+        MigrarAutorizado(caminho);
         var dados = Retrato(caminho);
         var esquema = LerEsquema(caminho);
 
@@ -233,7 +233,7 @@ public class MigracaoBancoTests : IDisposable
         var caminho = CriarLegado(pasta, "G1", ajuste: c => Sql(c, "CREATE TABLE \"FilaSincronizacao\" (\"Id\" TEXT NOT NULL PRIMARY KEY);"));
         var dadosAntes = Retrato(caminho);
 
-        var erro = Assert.Throws<MigracaoBancoException>(() => Migrar(caminho));
+        var erro = Assert.Throws<MigracaoBancoException>(() => MigrarAutorizado(caminho));
 
         Assert.Equal(EtapaMigracao.Migracao, erro.Etapa);
         Assert.NotNull(erro.CaminhoBackup);
@@ -247,7 +247,7 @@ public class MigracaoBancoTests : IDisposable
 
         // Correção da causa e nova inicialização: retoma de onde parou
         using (var c = Abrir(caminho)) { c.Open(); Sql(c, "DROP TABLE \"FilaSincronizacao\";"); }
-        var retomada = Migrar(caminho);
+        var retomada = MigrarAutorizado(caminho);
 
         Assert.Equal(SituacaoBanco.Gerenciado, retomada.Antes.Situacao);
         Assert.Equal(new[] { Sincronizacao }, retomada.Aplicadas);
@@ -306,7 +306,7 @@ public class MigracaoBancoTests : IDisposable
             Assert.Equal(hash, Hash(caminho));
         }
 
-        Assert.True(Migrar(caminho).HouveAlteracao);
+        Assert.True(MigrarAutorizado(caminho).HouveAlteracao);
     }
 
     [Fact]
@@ -316,8 +316,8 @@ public class MigracaoBancoTests : IDisposable
         var caminho = CriarLegado(pasta, "G1");
 
         var resultados = await Task.WhenAll(
-            Task.Run(() => Migrar(caminho, TimeSpan.FromSeconds(30))),
-            Task.Run(() => Migrar(caminho, TimeSpan.FromSeconds(30))));
+            Task.Run(() => MigrarAutorizado(caminho, TimeSpan.FromSeconds(30))),
+            Task.Run(() => MigrarAutorizado(caminho, TimeSpan.FromSeconds(30))));
 
         Assert.Single(resultados, r => r.HouveAlteracao);
         Assert.Single(resultados, r => !r.HouveAlteracao);

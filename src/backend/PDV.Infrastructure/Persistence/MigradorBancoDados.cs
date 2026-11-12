@@ -21,7 +21,13 @@ public enum SituacaoBanco
     Incompativel
 }
 
-public enum EtapaMigracao { Trava, Diagnostico, Backup, Baseline, Migracao, ValidacaoFinal }
+public enum EtapaMigracao { Trava, Diagnostico, Autorizacao, Backup, Baseline, Migracao, ValidacaoFinal }
+
+/// <summary>
+/// Autorização explícita para alterar um banco existente: o administrador confirma o arquivo exato
+/// e a versão (migration) de destino. Sem ela, bancos existentes nunca são alterados.
+/// </summary>
+public sealed record AutorizacaoMigracao(string CaminhoBanco, string MigracaoDestino);
 
 public sealed record DiagnosticoBanco(
     SituacaoBanco Situacao,
@@ -67,10 +73,18 @@ public sealed class OpcoesMigracaoBanco
 {
     /// <summary>Tempo máximo de espera pela trava quando outra instância está atualizando o banco.</summary>
     public TimeSpan EsperaTrava { get; init; } = TimeSpan.FromSeconds(60);
+
+    /// <summary>
+    /// Reservado para versões comerciais futuras: permite atualizar bancos existentes na inicialização normal,
+    /// sem o comando administrativo. DESATIVADO por padrão e não habilitado em nenhuma configuração atual.
+    /// </summary>
+    public bool AtualizacaoAutomatica { get; init; }
 }
 
 /// <summary>
 /// Substitui o EnsureCreated(): cria bancos novos pelas migrations e atualiza bancos existentes com segurança.
+/// Bancos existentes (com dados) só são alterados com <see cref="AutorizacaoMigracao"/> explícita
+/// (comando --atualizar-banco); na inicialização normal eles apenas são diagnosticados.
 /// Sequência: trava exclusiva → diagnóstico (integridade + reconhecimento do esquema) → backup validado →
 /// baseline (bancos criados por EnsureCreated) → Migrate() → validação final (esquema e preservação dos dados).
 /// Qualquer falha interrompe a inicialização sem alterar o banco ou com a migration em andamento desfeita.
@@ -104,6 +118,12 @@ public sealed class MigradorBancoDados
     }
 
     private IReadOnlyList<string> MigracoesConhecidas => _contexto.Database.GetMigrations().ToList();
+
+    /// <summary>Versão de destino desta build do PDV (última migration conhecida).</summary>
+    public string UltimaMigracao => MigracoesConhecidas.Last();
+
+    /// <summary>Caminho completo do banco, ou null se for em memória.</summary>
+    public string? Banco => CaminhoArquivo;
 
     private string? CaminhoArquivo
     {
@@ -175,8 +195,12 @@ public sealed class MigradorBancoDados
             .Prepend("O esquema não corresponde a nenhuma versão conhecida do PDV criada sem migrations.").ToArray());
     }
 
-    /// <summary>Cria ou atualiza o banco. Lança <see cref="MigracaoBancoException"/> com mensagem clara em qualquer falha.</summary>
-    public ResultadoMigracao Executar()
+    /// <summary>
+    /// Cria o banco (se novo) ou atualiza um banco existente. Bancos existentes com alterações pendentes exigem
+    /// <paramref name="autorizacao"/> que confirme o arquivo e a versão de destino; sem ela nada é alterado e é
+    /// lançada <see cref="MigracaoBancoException"/> na etapa <see cref="EtapaMigracao.Autorizacao"/>.
+    /// </summary>
+    public ResultadoMigracao Executar(AutorizacaoMigracao? autorizacao = null)
     {
         if (CaminhoArquivo == null)
         {
@@ -212,6 +236,9 @@ public sealed class MigradorBancoDados
                 return new ResultadoMigracao(antes, null, antes.MigracoesPendentes, true);
         }
 
+        // Banco existente que precisa de alteração: somente com autorização explícita (ou modo automático futuro)
+        VerificarAutorizacao(caminho, antes, autorizacao);
+
         // Banco com dados: backup validado antes de qualquer alteração
         var rotulo = antes.Situacao == SituacaoBanco.LegadoReconhecido ? "legado" : NomeCurto(antes.MigracoesAplicadas.LastOrDefault());
         var backup = Etapa(EtapaMigracao.Backup, null, () =>
@@ -239,6 +266,44 @@ public sealed class MigradorBancoDados
         ValidarFinal(caminho, backup, projecaoOriginal);
         _logger.LogInformation("Banco atualizado com sucesso. Backup anterior: {Backup}", backup.Caminho);
         return new ResultadoMigracao(antes, backup.Caminho, antes.MigracoesPendentes, true);
+    }
+
+    private void VerificarAutorizacao(string caminho, DiagnosticoBanco antes, AutorizacaoMigracao? autorizacao)
+    {
+        var destino = UltimaMigracao;
+        if (autorizacao == null)
+        {
+            if (_opcoes.AtualizacaoAutomatica)
+            {
+                _logger.LogWarning("Atualização automática habilitada: atualizando {Banco} para {Destino}.", caminho, destino);
+                return;
+            }
+
+            throw new MigracaoBancoException(EtapaMigracao.Autorizacao, MensagemAtualizacaoNecessaria(caminho, antes, destino));
+        }
+
+        if (!string.Equals(Path.GetFullPath(autorizacao.CaminhoBanco), caminho, StringComparison.OrdinalIgnoreCase))
+            throw new MigracaoBancoException(EtapaMigracao.Autorizacao,
+                $"A autorização foi dada para '{autorizacao.CaminhoBanco}', mas o banco configurado é '{caminho}'. Nada foi alterado.");
+
+        if (!string.Equals(autorizacao.MigracaoDestino, destino, StringComparison.Ordinal))
+            throw new MigracaoBancoException(EtapaMigracao.Autorizacao,
+                $"A versão de destino autorizada ('{autorizacao.MigracaoDestino}') não corresponde à versão desta build do PDV ('{destino}'). Nada foi alterado.");
+
+        _logger.LogWarning("Atualização do banco {Banco} autorizada explicitamente para a versão {Destino}.", caminho, destino);
+    }
+
+    /// <summary>Mensagem exibida quando o PDV não pode operar porque o banco precisa ser atualizado.</summary>
+    public static string MensagemAtualizacaoNecessaria(string caminho, DiagnosticoBanco diagnostico, string destino)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine($"O banco de dados '{caminho}' precisa ser ATUALIZADO para ser usado por esta versão do PDV. Nenhuma alteração foi feita.");
+        sb.AppendLine($"Situação: {diagnostico.Situacao}" + (diagnostico.GeracaoLegada != null ? $" (equivale a {diagnostico.GeracaoLegada})" : ""));
+        sb.AppendLine($"Alterações pendentes: {string.Join(", ", diagnostico.MigracoesPendentes.DefaultIfEmpty("registro do histórico de migrations (baseline)"))}");
+        sb.AppendLine("O PDV não será iniciado até que a atualização seja autorizada por um administrador:");
+        sb.AppendLine($"  PDV.API --atualizar-banco --banco \"{caminho}\" --destino {destino} --confirmar");
+        sb.Append("Um backup validado será criado antes da atualização. Veja docs/BANCO_DE_DADOS_MIGRATIONS.md.");
+        return sb.ToString();
     }
 
     private void ValidarFinal(string caminho, ResultadoBackup? backup, IReadOnlyDictionary<string, IReadOnlyList<string>>? projecaoOriginal)

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
+using PDV.API.Administracao;
 using PDV.API.BackgroundWorkers;
 using PDV.API.Middlewares;
 using PDV.API.Security;
@@ -108,6 +109,17 @@ if (args.Contains("--verificar-banco"))
     return;
 }
 
+// Comando administrativo: autoriza explicitamente a atualização de um banco existente (confirmando arquivo e versão).
+// Não carrega a chave JWT nem sobe o servidor.
+if (args.Contains(ComandoAtualizarBanco.Argumento))
+{
+    using var escopoAtualizacao = app.Services.CreateScope();
+    Console.OutputEncoding = System.Text.Encoding.UTF8;
+    Environment.ExitCode = ComandoAtualizarBanco.Executar(
+        args, escopoAtualizacao.ServiceProvider.GetRequiredService<MigradorBancoDados>(), Console.Out);
+    return;
+}
+
 // Carrega a chave de autenticação ANTES de tocar no banco: sem chave confiável a API não inicia (falha segura)
 try
 {
@@ -124,11 +136,17 @@ using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<PdvDbContext>();
 
-    // Cria (banco novo) ou atualiza (banco existente, com backup validado) pelas migrations do EF Core.
-    // Bancos criados pelo antigo EnsureCreated() são reconhecidos e recebem baseline sem recriar tabelas.
+    // Banco novo: criado pelas migrations. Banco existente: apenas diagnosticado — se precisar de atualização
+    // (inclusive baseline de bancos criados pelo antigo EnsureCreated), o PDV NÃO inicia e informa o comando
+    // administrativo --atualizar-banco. Nenhuma migração de banco existente acontece na inicialização normal.
     try
     {
         scope.ServiceProvider.GetRequiredService<MigradorBancoDados>().Executar();
+    }
+    catch (MigracaoBancoException ex) when (ex.Etapa == EtapaMigracao.Autorizacao)
+    {
+        app.Logger.LogCritical("ATUALIZAÇÃO DO BANCO NECESSÁRIA: {Mensagem}", ex.Message);
+        throw;
     }
     catch (MigracaoBancoException ex)
     {

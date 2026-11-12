@@ -52,6 +52,12 @@ public static class DependencyInjection
         services.AddScoped<ISincronizacaoRepository, SincronizacaoRepository>();
 
         // Criação/atualização segura do banco por migrations (substitui EnsureCreated)
+        // Atualização automática de bancos existentes: reservada para versões futuras, DESATIVADA por padrão.
+        // Sem ela, bancos existentes só são alterados pelo comando administrativo --atualizar-banco.
+        services.AddSingleton(new OpcoesMigracaoBanco
+        {
+            AtualizacaoAutomatica = bool.TryParse(configuration["Banco:AtualizacaoAutomatica"], out var automatica) && automatica
+        });
         services.AddScoped<MigradorBancoDados>();
 
         // Serviços Externos e de Suporte
