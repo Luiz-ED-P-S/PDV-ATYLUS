@@ -1,6 +1,11 @@
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi.Models;
 using PDV.API.BackgroundWorkers;
 using PDV.API.Middlewares;
+using PDV.API.Security;
 using PDV.Application;
 using PDV.Domain.Entities;
 using PDV.Domain.Enums;
@@ -23,6 +28,46 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new() { Title = "PDV Atylus API", Version = "v1", Description = "API do Ponto de Venda Offline-First com Clean Architecture e CQRS" });
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Token obtido em POST /api/v1/auth/login"
+    });
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme { Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" } },
+            Array.Empty<string>()
+        }
+    });
+});
+
+// Autenticação local e offline: JWT assinado com chave simétrica guardada na própria máquina
+var jwtOptions = JwtOptions.Carregar(builder.Configuration, builder.Environment);
+builder.Services.AddSingleton(jwtOptions);
+builder.Services.AddSingleton<JwtTokenService>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<LoginAttemptLimiter>(sp => new LoginAttemptLimiter(sp.GetRequiredService<TimeProvider>()));
+
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.MapInboundClaims = false;
+        options.TokenValidationParameters = jwtOptions.ParametrosValidacao();
+    })
+    .AddScheme<AuthenticationSchemeOptions, SyncApiKeyAuthenticationHandler>(SyncApiKeyAuthenticationHandler.NomeEsquema, null);
+
+builder.Services.AddAuthorization(options =>
+{
+    // Qualquer endpoint sem regra explícita exige usuário autenticado (rede de segurança)
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
 });
 
 // Worker de Backup em segundo plano no Google Drive e Worker de Sincronização em Nuvem (Offline-First)
@@ -128,21 +173,26 @@ else
     app.UseStaticFiles();
 }
 
+app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
 // Endpoint de Healthcheck para verificação de status da API
-app.MapGet("/health", () => Results.Ok(new { status = "healthy", version = "1.0.0", timestamp = DateTime.UtcNow }));
+app.MapGet("/health", () => Results.Ok(new { status = "healthy", version = "1.0.0", timestamp = DateTime.UtcNow }))
+   .AllowAnonymous();
 
-// Fallback para SPA React (roteamento no cliente)
+// Fallback para SPA React (roteamento no cliente) — a tela de login precisa carregar sem token
 if (!string.IsNullOrEmpty(wwwrootDir) && Directory.Exists(wwwrootDir) && File.Exists(Path.Combine(wwwrootDir, "index.html")))
 {
     var physicalProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(wwwrootDir);
-    app.MapFallbackToFile("index.html", new StaticFileOptions { FileProvider = physicalProvider });
+    app.MapFallbackToFile("index.html", new StaticFileOptions { FileProvider = physicalProvider }).AllowAnonymous();
 }
 else
 {
-    app.MapFallbackToFile("index.html");
+    app.MapFallbackToFile("index.html").AllowAnonymous();
 }
 
 app.Run();
+
+// Exposto para testes de integração (WebApplicationFactory)
+public partial class Program { }

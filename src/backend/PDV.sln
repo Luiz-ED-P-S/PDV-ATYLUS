@@ -1,4 +1,4 @@
-Microsoft Visual Studio Solution File, Format Version 12.00
+﻿Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
@@ -9,6 +9,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PDV.Infrastructure", "PDV.Infrastructure\PDV.Infrastructure.csproj", "{68C5E78D-9E9C-4D3E-A5CD-D7C57E6D7E3A}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PDV.API", "PDV.API\PDV.API.csproj", "{DFB757C2-1C38-4F2A-A81A-97F72496E762}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PDV.Tests", "PDV.Tests\PDV.Tests.csproj", "{244E3F07-AF16-4731-9D66-BD33DFE82E9D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -32,5 +34,9 @@ Global
 		{DFB757C2-1C38-4F2A-A81A-97F72496E762}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DFB757C2-1C38-4F2A-A81A-97F72496E762}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DFB757C2-1C38-4F2A-A81A-97F72496E762}.Release|Any CPU.Build.0 = Release|Any CPU
+		{244E3F07-AF16-4731-9D66-BD33DFE82E9D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{244E3F07-AF16-4731-9D66-BD33DFE82E9D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{244E3F07-AF16-4731-9D66-BD33DFE82E9D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{244E3F07-AF16-4731-9D66-BD33DFE82E9D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

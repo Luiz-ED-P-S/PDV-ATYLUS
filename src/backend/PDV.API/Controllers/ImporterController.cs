@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Authorization;
+using PDV.API.Security;
 using Microsoft.AspNetCore.Mvc;
 using PDV.Application.DTOs;
 using PDV.Domain.Entities;
@@ -7,6 +9,7 @@ namespace PDV.API.Controllers;
 
 [ApiController]
 [Route("api/v1/[controller]")]
+[Authorize(Roles = Perfis.Supervisor)]
 public class ImporterController : ControllerBase
 {
     private readonly ISpreadsheetAiService _spreadsheetAiService;

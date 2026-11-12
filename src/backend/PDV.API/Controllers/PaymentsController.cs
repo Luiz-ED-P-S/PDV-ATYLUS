@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Authorization;
+using PDV.API.Security;
 using Microsoft.AspNetCore.Mvc;
 using PDV.Domain.Interfaces;
 
@@ -5,6 +7,7 @@ namespace PDV.API.Controllers;
 
 [ApiController]
 [Route("api/v1/[controller]")]
+[Authorize]
 public class PaymentsController : ControllerBase
 {
     private readonly IPixService _pixService;

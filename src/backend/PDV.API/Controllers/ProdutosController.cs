@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Authorization;
+using PDV.API.Security;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using PDV.Application.Commands.Produtos;
@@ -8,6 +10,7 @@ namespace PDV.API.Controllers;
 
 [ApiController]
 [Route("api/v1/[controller]")]
+[Authorize]
 public class ProdutosController : ControllerBase
 {
     private readonly IMediator _mediator;
@@ -35,6 +38,7 @@ public class ProdutosController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = Perfis.Supervisor)]
     public async Task<ActionResult<ProdutoDto>> CriarProduto([FromBody] CriarProdutoCommand command)
     {
         var produto = await _mediator.Send(command);
@@ -42,6 +46,7 @@ public class ProdutosController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = Perfis.Supervisor)]
     public async Task<ActionResult<ProdutoDto>> AtualizarProduto(Guid id, [FromBody] AtualizarProdutoRequest request)
     {
         var produto = await _mediator.Send(new AtualizarProdutoCommand(
