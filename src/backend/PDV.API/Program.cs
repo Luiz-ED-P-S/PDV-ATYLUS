@@ -14,6 +14,12 @@ using PDV.Infrastructure;
 using PDV.Infrastructure.Context;
 using PDV.Infrastructure.Persistence;
 
+// Versão desktop: o Electron lê a saída do servidor; força UTF-8 para acentos corretos nos logs e mensagens de erro.
+if (Environment.GetEnvironmentVariable("PDV_DESKTOP_MODE") == "1")
+{
+    Console.OutputEncoding = new System.Text.UTF8Encoding(false);
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Configuração das camadas Clean Architecture
@@ -218,8 +224,7 @@ if (string.IsNullOrWhiteSpace(wwwrootDir) || !Directory.Exists(wwwrootDir))
         Environment.ProcessPath != null ? Path.GetFullPath(Path.Combine(Path.GetDirectoryName(Environment.ProcessPath)!, "../../src/backend/PDV.API/wwwroot")) : null,
         Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../wwwroot")),
         Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"),
-        Path.Combine(Directory.GetCurrentDirectory(), "src/backend/PDV.API/wwwroot"),
-        @"c:\Users\Luiz Ed\OneDrive\Documentos\PDV-ATYLUS\src\backend\PDV.API\wwwroot"
+        Path.Combine(Directory.GetCurrentDirectory(), "src/backend/PDV.API/wwwroot")
     };
 
     wwwrootDir = candidates.FirstOrDefault(p => !string.IsNullOrEmpty(p) && Directory.Exists(p) && File.Exists(Path.Combine(p, "index.html")));

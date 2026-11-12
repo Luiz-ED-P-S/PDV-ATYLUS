@@ -41,7 +41,7 @@ public class CloudSyncService : ICloudSyncService
         _httpClient.Timeout = TimeSpan.FromSeconds(5);
         _logger = logger;
 
-        var appData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "PDV-ATYLUS");
+        var appData = PastaDadosApp.Resolver();
         Directory.CreateDirectory(appData);
         _configFile = Path.Combine(appData, "cloud_sync_config.json");
 
