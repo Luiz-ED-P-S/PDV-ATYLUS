@@ -26,6 +26,15 @@ Desinstalar **não** apaga essa pasta: o desinstalador só remove a pasta de ins
 Reinstalar/atualizar sobre uma instalação existente substitui só os arquivos do programa; banco e chave permanecem. O app **não** lê nem altera `%APPDATA%\PDV-ATYLUS`.
 Bancos existentes continuam exigindo `--atualizar-banco` (autorização explícita); o app só exibe o aviso.
 
+## Primeiro acesso e PINs
+
+A instalação nova cria dois operadores de demonstração: **OP01/0000** (Operador) e **GER01/1234** (Supervisor).
+Esses PINs são *temporários*: o login funciona, mas a API só aceita a troca do PIN (`POST auth/alterar-pin`) e `GET auth/me`
+até o PIN ser trocado (tudo mais responde 403 `PIN_TEMPORARIO`); o app mostra a tela "Defina um novo PIN".
+O novo PIN tem 4 a 8 dígitos, exige confirmação, não pode ser o PIN de fábrica nem sequencial/repetido (1111, 4321, 1212).
+Um Supervisor com PIN de fábrica também não consegue autorizar cancelamentos nem confirmar Pix. A marca vem de uma claim
+assinada no token, não do navegador; a troca fica gravada (hash BCrypt) no SQLite e vale após fechar e reabrir.
+
 ## Gerar o instalador
 
 ```bash

@@ -48,6 +48,13 @@ function Login([string]$url, [string]$mat, [string]$pin) {
   $r = Invoke-RestMethod "$url/api/v1/auth/login" -Method Post -ContentType 'application/json' -Body (@{ matricula = $mat; pin = $pin } | ConvertTo-Json)
   return @{ Authorization = "Bearer $($r.token)" }
 }
+function Trocar-Pin([string]$url, [string]$mat, [string]$atual, [string]$novo) {
+  $h = Login $url $mat $atual
+  $r = Invoke-RestMethod "$url/api/v1/auth/alterar-pin" -Method Post -Headers $h -ContentType 'application/json' -Body (@{ pinAtual = $atual; novoPin = $novo; confirmacaoNovoPin = $novo } | ConvertTo-Json)
+  return @{ Authorization = "Bearer $($r.token)" }
+}
+function Status-Get([string]$url, [hashtable]$h) { try { return (Invoke-WebRequest $url -Headers $h -UseBasicParsing).StatusCode } catch { return $_.Exception.Response.StatusCode.value__ } }
+
 function Titulo-Cdp([int]$porta) { try { return (Invoke-RestMethod "http://127.0.0.1:$porta/json")[0] } catch { return $null } }
 
 try {
@@ -104,7 +111,11 @@ try {
     Registrar '3. Inicializacao normal: backend pronto' $ok ''
     $url = UltimaUrl $d
     Registrar '3. Janela carrega a interface React' ((Titulo-Cdp 9353).url -like "$url*") ((Titulo-Cdp 9353).title)
-    $h = Login $url 'OP01' '0000'
+    # Primeiro acesso: PIN de fabrica permite entrar, mas a API so libera a troca do PIN
+    $hTemp = Login $url 'OP01' '0000'
+    Registrar '3. PIN de fabrica: API bloqueada antes da troca (403)' ((Status-Get "$url/api/v1/produtos" $hTemp) -eq 403) ''
+    $h = Trocar-Pin $url 'OP01' '0000' '7391'
+    Registrar '3. Troca de PIN libera o acesso' ((Status-Get "$url/api/v1/produtos" $h) -eq 200) ''
     $caixa = Invoke-RestMethod "$url/api/v1/caixa/abrir" -Method Post -Headers $h -ContentType 'application/json' -Body '{"operadorId":"OP01","saldoInicial":80}'
     $prod = (Invoke-RestMethod "$url/api/v1/produtos" -Headers $h)[0]
     $venda = @{ operadorId = 'OP01'; desconto = 0; itens = @(@{ produtoId = $prod.id; quantidade = 1; precoUnitario = [decimal]$prod.precoVenda }); pagamentos = @(@{ formaPagamento = 'Dinheiro'; valor = [decimal]$prod.precoVenda }) } | ConvertTo-Json -Depth 5
@@ -139,9 +150,11 @@ try {
     $ok = Esperar { ([regex]::Matches((Get-Content $log -Raw -Encoding UTF8), 'Backend pronto')).Count -ge 2 } 120
     Registrar '5. Reabertura: backend pronto' $ok ''
     $url2 = UltimaUrl $d
-    $h2 = Login $url2 'OP01' '0000'
+    $h2 = Login $url2 'OP01' '7391'
     $vendas = @(Invoke-RestMethod "$url2/api/v1/vendas" -Headers $h2)
     Registrar '5. Reabertura: venda anterior persistida' (($vendas | ? { $_.id -eq $v.id }).Count -eq 1) ''
+    $loginAntigo = try { Login $url2 'OP01' '0000'; 200 } catch { $_.Exception.Response.StatusCode.value__ }
+    Registrar '5. Reabertura: PIN de fabrica nao vale mais (troca persistiu)' ($loginAntigo -eq 401) ''
     Registrar '5. Reabertura: chave JWT inalterada' ((Get-FileHash "$d\jwt-signing.key").Hash -eq $chaveAntes) ''
     $semAntigoToken = try { Invoke-WebRequest "$url2/api/v1/produtos" -Headers $h -UseBasicParsing | Out-Null; 200 } catch { $_.Exception.Response.StatusCode.value__ }
     Registrar '5. Reabertura: token da sessao anterior continua valido (mesma chave)' ($semAntigoToken -eq 200) ''

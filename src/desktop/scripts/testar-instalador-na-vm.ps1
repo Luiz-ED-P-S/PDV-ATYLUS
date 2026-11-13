@@ -39,8 +39,15 @@ switch ($Fase) {
   'apos-abrir' {
     R 'Servidor e janela em execucao' ((Procs) -ge 2) "processos=$(Procs)"
     $url = UltimaUrl; R 'Backend pronto (log)' ($url -ne '') $url
-    $h = Login $url 'OP01' '0000'; R 'Login Operador' ($true)
-    $hs = Login $url 'GER01' '1234'; R 'Login Supervisor' ($true)
+    # Primeiro acesso: PIN de fabrica entra, mas a API bloqueia tudo ate o PIN ser trocado
+    $hTemp = Login $url 'OP01' '0000'; R 'Login Operador (PIN de fabrica)' ($true)
+    $bloq = try { (Invoke-WebRequest "$url/api/v1/produtos" -Headers $hTemp -UseBasicParsing).StatusCode } catch { $_.Exception.Response.StatusCode.value__ }
+    R 'API bloqueada ate trocar o PIN (403)' ($bloq -eq 403) ''
+    $r = Invoke-RestMethod "$url/api/v1/auth/alterar-pin" -Method Post -Headers $hTemp -ContentType 'application/json' -Body (@{ pinAtual = '0000'; novoPin = '7391'; confirmacaoNovoPin = '7391' } | ConvertTo-Json)
+    $h = @{ Authorization = "Bearer $($r.token)" }; R 'Troca de PIN do Operador' ($true)
+    $hsTemp = Login $url 'GER01' '1234'; R 'Login Supervisor (PIN de fabrica)' ($true)
+    $r2 = Invoke-RestMethod "$url/api/v1/auth/alterar-pin" -Method Post -Headers $hsTemp -ContentType 'application/json' -Body (@{ pinAtual = '1234'; novoPin = '5802'; confirmacaoNovoPin = '5802' } | ConvertTo-Json)
+    $hs = @{ Authorization = "Bearer $($r2.token)" }; R 'Troca de PIN do Supervisor' ($true)
     $semToken = try { (Invoke-WebRequest "$url/api/v1/produtos" -UseBasicParsing).StatusCode } catch { $_.Exception.Response.StatusCode.value__ }
     R 'API recusa requisicao sem token' ($semToken -eq 401) ''
     $escuta = Get-NetTCPConnection -State Listen -LocalPort ([uri]$url).Port -ErrorAction SilentlyContinue
@@ -62,7 +69,7 @@ switch ($Fase) {
   }
   'apos-reabrir' {
     $cod, $vid, $hash = (Get-Content $estado).Split(';')
-    $url = UltimaUrl; $h = Login $url 'OP01' '0000'
+    $url = UltimaUrl; $h = Login $url 'OP01' '7391'
     R 'Produto persistido' (@(Invoke-RestMethod "$url/api/v1/produtos" -Headers $h) | ? { $_.codigoBarras -eq $cod }) $cod
     R 'Venda persistida' (@(Invoke-RestMethod "$url/api/v1/vendas" -Headers $h) | ? { $_.id -eq $vid }) ''
     R 'Chave JWT inalterada' ((Get-FileHash (Join-Path $dados 'jwt-signing.key')).Hash -eq $hash) ''

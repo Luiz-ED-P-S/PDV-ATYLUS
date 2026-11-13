@@ -9,6 +9,7 @@ const api = axios.create({
 // ===== Autenticação (JWT emitido pelo backend local) =====
 let tokenAtual: string | null = null;
 let aoPerderAutorizacao: (() => void) | null = null;
+let aoExigirTrocaPin: (() => void) | null = null;
 
 /** Define o token enviado em todas as requisições (null remove). */
 export const setAuthToken = (token: string | null) => {
@@ -22,6 +23,11 @@ export const authHeaders = (): Record<string, string> =>
 /** Callback chamado quando a API responde 401 (token ausente, expirado ou inválido). */
 export const setOnUnauthorized = (callback: () => void) => {
   aoPerderAutorizacao = callback;
+};
+
+/** Callback chamado quando a API recusa a ação porque o operador ainda usa PIN temporário (403 PIN_TEMPORARIO). */
+export const setOnPinTemporario = (callback: () => void) => {
+  aoExigirTrocaPin = callback;
 };
 
 const ROTAS_AUTH_SEM_LOGOUT = ['/auth/login', '/auth/autorizar-supervisor', '/auth/alterar-pin'];
@@ -43,6 +49,9 @@ api.interceptors.response.use(
 
     if (status === 401 && !rotaDeAuth) {
       aoPerderAutorizacao?.();
+    } else if (status === 403 && erro.response?.data?.codigo === 'PIN_TEMPORARIO') {
+      // A API é a autoridade: o frontend apenas mostra a tela de troca obrigatória
+      aoExigirTrocaPin?.();
     } else if (status === 403) {
       const mensagem = 'Ação permitida apenas para Supervisor.';
       erro.message = mensagem;
@@ -82,6 +91,12 @@ export const authApi = {
     }
   },
 
+  /** Situação da sessão segundo o backend (inclui se o PIN ainda é temporário). */
+  async me(): Promise<OperadorLoginResposta> {
+    const res = await api.get<OperadorLoginResposta>('/auth/me');
+    return res.data;
+  },
+
   async autorizarSupervisor(pin: string): Promise<void> {
     try {
       await api.post('/auth/autorizar-supervisor', { pin });
@@ -91,9 +106,9 @@ export const authApi = {
   },
 
   /** Troca o PIN; o backend invalida os tokens anteriores e devolve um novo para esta sessão. */
-  async alterarPin(pinAtual: string, novoPin: string): Promise<LoginResposta> {
+  async alterarPin(pinAtual: string, novoPin: string, confirmacaoNovoPin: string): Promise<LoginResposta> {
     try {
-      const res = await api.post<LoginResposta>('/auth/alterar-pin', { pinAtual, novoPin });
+      const res = await api.post<LoginResposta>('/auth/alterar-pin', { pinAtual, novoPin, confirmacaoNovoPin });
       return res.data;
     } catch (err: any) {
       throw new Error(mensagemDeErro(err, 'Não foi possível alterar o PIN.'));

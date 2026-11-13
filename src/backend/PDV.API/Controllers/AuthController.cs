@@ -60,7 +60,7 @@ public class AuthController : ControllerBase
             User.Identity?.Name ?? string.Empty,
             User.ObterMatricula() ?? string.Empty,
             User.IsInRole(Perfis.Supervisor) ? Perfis.Supervisor : Perfis.Operador,
-            false));
+            User.TemPinTemporario()));
     }
 
     /// <summary>
@@ -95,7 +95,7 @@ public class AuthController : ControllerBase
         if (_limiter.TempoRestanteBloqueio(chave) is { } restante)
             return Bloqueado(restante);
 
-        var operador = await _mediator.Send(new AlterarPinCommand(id.Value, request.PinAtual ?? string.Empty, request.NovoPin ?? string.Empty), cancellationToken);
+        var operador = await _mediator.Send(new AlterarPinCommand(id.Value, request.PinAtual ?? string.Empty, request.NovoPin ?? string.Empty, request.ConfirmacaoNovoPin ?? string.Empty), cancellationToken);
         if (operador == null)
         {
             _limiter.RegistrarFalha(chave);
@@ -122,7 +122,7 @@ public class AuthController : ControllerBase
 
 public record LoginRequest(string? Matricula, string? Pin);
 public record AutorizarSupervisorRequest(string? Pin);
-public record AlterarPinRequest(string? PinAtual, string? NovoPin);
+public record AlterarPinRequest(string? PinAtual, string? NovoPin, string? ConfirmacaoNovoPin);
 
 public record OperadorResponse(Guid Id, string Nome, string Matricula, string Perfil, bool UsaPinPadrao)
 {

@@ -182,9 +182,11 @@ public class ConfirmarPixManualCommandHandler : IRequestHandler<ConfirmarPixManu
     private readonly IPixProvedor _provedor;
     private readonly IUnitOfWork _unitOfWork;
     private readonly TimeProvider _relogio;
+    private readonly PDV.Application.Commands.Auth.OpcoesSeguranca _opcoesSeguranca;
 
-    public ConfirmarPixManualCommandHandler(ICobrancaPixRepository cobrancas, IOperadorRepository operadores, IPixProvedor provedor, IUnitOfWork unitOfWork, TimeProvider relogio)
+    public ConfirmarPixManualCommandHandler(ICobrancaPixRepository cobrancas, IOperadorRepository operadores, IPixProvedor provedor, IUnitOfWork unitOfWork, TimeProvider relogio, PDV.Application.Commands.Auth.OpcoesSeguranca opcoesSeguranca)
     {
+        _opcoesSeguranca = opcoesSeguranca;
         _cobrancas = cobrancas;
         _operadores = operadores;
         _provedor = provedor;
@@ -205,6 +207,9 @@ public class ConfirmarPixManualCommandHandler : IRequestHandler<ConfirmarPixManu
             return new ResultadoConfirmacaoManual(false, null);
         }
         if (supervisor.Perfil != PerfilOperador.Supervisor || !supervisor.ValidarPin(request.SupervisorPin ?? string.Empty))
+            return new ResultadoConfirmacaoManual(false, null);
+        // PIN de fábrica/trivial não confirma recebimento: o supervisor precisa trocá-lo primeiro
+        if (_opcoesSeguranca.ExigirTrocaPinTemporario && PDV.Application.Commands.Auth.PoliticaPin.EhTemporario(request.SupervisorPin))
             return new ResultadoConfirmacaoManual(false, null);
 
         var agora = _relogio.GetUtcNow().UtcDateTime;

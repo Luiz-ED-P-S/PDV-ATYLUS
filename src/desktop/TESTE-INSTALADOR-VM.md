@@ -22,9 +22,11 @@ Confira o SHA-256 do instalador dentro da VM (`Get-FileHash`).
 2. **Atalhos**: "ATYLUS PDV Desktop" na Área de Trabalho e no Menu Iniciar.
 3. **Abrir pelo Menu Iniciar**: janela própria "ATYLUS PDV"; se o servidor falhar, aparece a tela de erro.
 4. **Backend automático**: `PDV.API.exe` aparece no Gerenciador de Tarefas; `%APPDATA%\ATYLUS PDV Desktop\logs\backend.log` existe.
-5. **Login**: OP01/0000 (Operador) e GER01/1234 (Supervisor).
+5. **Primeiro acesso**: entre com OP01/0000 (Operador): aparece a tela "Defina um novo PIN" e nada mais funciona até trocar
+   (4 a 8 dígitos, sem sequências/repetições, diferente de 0000/1234). Troque para, por exemplo, `7391`.
+   Repita com GER01/1234 (Supervisor) → `5802`. Depois confira o login com os PINs novos e que 0000/1234 não entram mais.
 6. **Produtos**: cadastrar e consultar um produto.
-7. **Venda de teste**: abrir caixa e registrar uma venda em dinheiro (Pix exige Supervisor, sem QR Code).
+7. **Venda de teste**: abrir caixa e registrar uma venda em dinheiro (Pix exige Supervisor com PIN já trocado, sem QR Code).
 8. **Persistência**: fechar o app, reabrir; produto, venda e login continuam.
 9. **Sem internet**: desconectar a rede da VM e repetir 3–8.
 10. **Encerramento**: fechar a janela; nenhum `ATYLUS PDV.exe`/`PDV.API.exe` restante.

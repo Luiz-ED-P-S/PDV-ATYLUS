@@ -32,6 +32,7 @@ public class PdvApiFactory : WebApplicationFactory<Program>
     private readonly bool _apagarAoDescartar;
     private readonly string? _contentRoot;
     private readonly string _ambiente;
+    private readonly bool _exigirTrocaPin;
     private readonly Dictionary<string, string?> _variaveisAnteriores = new();
 
     public string DataDir { get; }
@@ -44,9 +45,10 @@ public class PdvApiFactory : WebApplicationFactory<Program>
     /// <param name="dataDir">Pasta de dados temporária (reutilizável para simular reinício da API).</param>
     /// <param name="apagarAoDescartar">Apaga a pasta ao descartar a fábrica.</param>
     /// <param name="contentRoot">Pasta "de instalação" alternativa, para simular atualização do aplicativo.</param>
-    protected PdvApiFactory(string? dataDir, bool apagarAoDescartar, string? contentRoot = null, string ambiente = "Testing")
+    protected PdvApiFactory(string? dataDir, bool apagarAoDescartar, string? contentRoot = null, string ambiente = "Testing", bool exigirTrocaPin = false)
     {
         _ambiente = ambiente;
+        _exigirTrocaPin = exigirTrocaPin;
         DataDir = dataDir ?? Path.Combine(Path.GetTempPath(), "pdv-tests-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(DataDir);
         _apagarAoDescartar = apagarAoDescartar;
@@ -63,6 +65,8 @@ public class PdvApiFactory : WebApplicationFactory<Program>
         builder.UseSetting("CloudSync:HubApiKey", HubApiKey);
         // Simulação de Pix pedida explicitamente; o servidor só a habilita em Development/Testing
         builder.UseSetting("Pix:PermitirSimulacao", "true");
+        // Os testes existentes usam PINs de fábrica/seed; a exigência de troca é desligada só aqui (Testing) e ligada nos testes dela
+        builder.UseSetting("Seguranca:ExigirTrocaPinTemporario", _exigirTrocaPin ? "true" : "false");
         builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<IHostedService>();
@@ -137,8 +141,8 @@ public class PdvApiFactory : WebApplicationFactory<Program>
 /// </summary>
 public sealed class PdvApiFactoryPersonalizada : PdvApiFactory
 {
-    public PdvApiFactoryPersonalizada(string dataDir, bool apagarAoDescartar, string? contentRoot = null, string ambiente = "Testing")
-        : base(dataDir, apagarAoDescartar, contentRoot, ambiente) { }
+    public PdvApiFactoryPersonalizada(string dataDir, bool apagarAoDescartar, string? contentRoot = null, string ambiente = "Testing", bool exigirTrocaPin = false)
+        : base(dataDir, apagarAoDescartar, contentRoot, ambiente, exigirTrocaPin) { }
 }
 
 [CollectionDefinition(Nome)]

@@ -29,6 +29,10 @@ builder.Services.AddApplication();
 builder.Services.AddSingleton(PDV.Application.Commands.Pix.OpcoesPix.Para(
     builder.Environment.EnvironmentName,
     bool.TryParse(builder.Configuration["Pix:PermitirSimulacao"], out var pixSimulacao) && pixSimulacao));
+// Troca obrigatória de PIN temporário: sempre ativa; só pode ser desligada em Development/Testing (testes)
+builder.Services.AddSingleton(PDV.Application.Commands.Auth.OpcoesSeguranca.Para(
+    builder.Environment.EnvironmentName,
+    bool.TryParse(builder.Configuration["Seguranca:ExigirTrocaPinTemporario"], out var exigirTrocaPin) ? exigirTrocaPin : null));
 builder.Services.AddInfrastructure(builder.Configuration);
 
 // Controllers e Swagger
@@ -245,6 +249,7 @@ else
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<PinTemporarioMiddleware>();
 app.MapControllers();
 
 // Endpoint de Healthcheck para verificação de status da API
