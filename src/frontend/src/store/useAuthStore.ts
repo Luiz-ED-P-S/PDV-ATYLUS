@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { authApi, LoginResposta, setAuthToken, setOnUnauthorized } from '../services/api';
+import avatarPadraoLocal from '../assets/avatar-padrao.svg';
 
 export type PerfilOperador = 'Operador' | 'Supervisor';
 
@@ -18,8 +19,12 @@ const STORAGE_KEY_SESSAO = 'pdv_atylus_sessao_v2';
 const STORAGE_KEY_PERFIL_VISUAL = 'pdv_atylus_perfil_visual_v1';
 const STORAGE_KEY_AUTH_LEGADO = 'pdv_atylus_auth_v1';
 
-const AVATAR_PADRAO =
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&h=120&q=80';
+// Avatar padrão local (embutido no pacote): o PDV funciona offline, sem imagens de URLs externas.
+const AVATAR_PADRAO = avatarPadraoLocal;
+
+// Perfis salvos por versões anteriores podem ter a URL externa antiga; ela é trocada pelo avatar local.
+const normalizarAvatar = (url?: string): string =>
+  !url || /^https?:\/\/images\.unsplash\.com\//i.test(url) ? AVATAR_PADRAO : url;
 
 const operadorDeslogado: OperadorAuth = {
   id: '',
@@ -95,7 +100,7 @@ const montarOperador = (sessao: SessaoSalva, payload: PayloadToken): OperadorAut
     matricula: sessao.operador.matricula,
     nome: visual.nome || sessao.operador.nome,
     email: visual.email,
-    avatarUrl: visual.avatarUrl || AVATAR_PADRAO,
+    avatarUrl: normalizarAvatar(visual.avatarUrl),
     role: perfilDoToken(payload),
   };
 };

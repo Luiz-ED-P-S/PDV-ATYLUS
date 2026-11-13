@@ -1,0 +1,12 @@
+/*
+ * Fontes locais (sem Google Fonts): o PDV precisa funcionar 100% offline.
+ * Inter (400-800) e JetBrains Mono (500, 700), subconjunto latin (inclui acentos do português).
+ * Licença: SIL Open Font License 1.1 — ver LICENSE-Inter-OFL.txt e LICENSE-JetBrainsMono-OFL.txt em ./assets/fonts.
+ */
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 400; font-display: swap; src: url('./assets/fonts/inter-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 500; font-display: swap; src: url('./assets/fonts/inter-latin-500-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 600; font-display: swap; src: url('./assets/fonts/inter-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 700; font-display: swap; src: url('./assets/fonts/inter-latin-700-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 800; font-display: swap; src: url('./assets/fonts/inter-latin-800-normal.woff2') format('woff2'); }
+@font-face { font-family: 'JetBrains Mono'; font-style: normal; font-weight: 500; font-display: swap; src: url('./assets/fonts/jetbrains-mono-latin-500-normal.woff2') format('woff2'); }
+@font-face { font-family: 'JetBrains Mono'; font-style: normal; font-weight: 700; font-display: swap; src: url('./assets/fonts/jetbrains-mono-latin-700-normal.woff2') format('woff2'); }

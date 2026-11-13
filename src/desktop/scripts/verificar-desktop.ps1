@@ -83,6 +83,19 @@ try {
     Registrar '2. Porta ocupada: nenhum servidor restante' (-not (Get-CimInstance Win32_Process | ? { $_.ExecutablePath -like "$desktop\resources\backend\PDV.API.exe" })) ''
   }
 
+  # ---------------- 6. Interface 100% local (fontes, CSS, JS, imagens) ----------------
+  if ($Cenario -in 'tudo', 'interface') {
+    $d = Join-Path $raizTeste 'interface-local'; New-Item -ItemType Directory $d | Out-Null
+    $p = Iniciar $d @{ ATYLUS_REMOTE_DEBUG = '9355' }
+    $ok = Esperar { LogTem $d 'Backend pronto' } 120
+    Registrar '6. Interface: janela carregada' $ok ''
+    Start-Sleep -Seconds 3
+    $saida = & node (Join-Path $PSScriptRoot 'verificar-interface.js') 9355 2>&1
+    $saida | ForEach-Object { $script:resultados.Add("      $_") }
+    Registrar '6. Interface: somente recursos locais, fontes e imagens do pacote' ($LASTEXITCODE -eq 0) ''
+    Encerrar-Arvore $p.Id
+  }
+
   # ---------------- 3/4/5. Instancia unica, persistencia, encerramento ----------------
   if ($Cenario -in 'tudo', 'instancia') {
     $d = Join-Path $raizTeste 'dados-normais'; New-Item -ItemType Directory $d | Out-Null
