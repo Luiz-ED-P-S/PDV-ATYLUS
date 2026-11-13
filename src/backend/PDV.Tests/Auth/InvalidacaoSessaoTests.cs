@@ -32,7 +32,7 @@ public class InvalidacaoSessaoTests
         using var clienteAntigo = _factory.CriarClienteAutenticado(antigo);
         Assert.Equal(HttpStatusCode.OK, (await clienteAntigo.GetAsync("/api/v1/auth/me")).StatusCode);
 
-        var troca = await clienteAntigo.PostAsJsonAsync("/api/v1/auth/alterar-pin", new { pinAtual = PdvApiFactory.PinExtras, novoPin = "7531" });
+        var troca = await clienteAntigo.PostAsJsonAsync("/api/v1/auth/alterar-pin", new { pinAtual = PdvApiFactory.PinExtras, novoPin = "7531", confirmacaoNovoPin = "7531" });
         Assert.Equal(HttpStatusCode.OK, troca.StatusCode);
         var novo = (await troca.Content.ReadFromJsonAsync<PdvApiFactory.LoginBody>())!;
         Assert.False(string.IsNullOrWhiteSpace(novo.Token));

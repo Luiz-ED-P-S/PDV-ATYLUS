@@ -1,0 +1,21 @@
+{
+  "name": "atylus-pdv-desktop",
+  "productName": "ATYLUS PDV",
+  "version": "1.0.0",
+  "description": "ATYLUS PDV - aplicativo desktop (Electron + React + ASP.NET Core + SQLite)",
+  "author": "ATYLUS",
+  "private": true,
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build:frontend": "npm --prefix ../frontend run build",
+    "publish:backend": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/publicar-backend.ps1",
+    "dist": "npm run build:frontend && npm run publish:backend && electron-builder --win nsis --x64",
+    "dist:somente-empacotar": "electron-builder --win nsis --x64",
+    "verificar": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verificar-pacote.ps1"
+  },
+  "devDependencies": {
+    "electron": "33.4.11",
+    "electron-builder": "25.1.8"
+  }
+}

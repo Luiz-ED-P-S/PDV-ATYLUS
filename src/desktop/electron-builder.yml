@@ -1,0 +1,42 @@
+appId: br.com.atylus.pdv
+productName: ATYLUS PDV
+copyright: ATYLUS
+directories:
+  output: dist
+  buildResources: assets
+files:
+  - electron/**
+  - assets/icon.ico
+  - assets/icon.png
+  - package.json
+extraResources:
+  - from: resources/backend
+    to: backend
+    filter:
+      - "**/*"
+      - "!**/*.db"
+      - "!**/*.db-shm"
+      - "!**/*.db-wal"
+      - "!appsettings.Development.json"
+afterPack: scripts/after-pack.js
+asar: true
+compression: normal
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: assets/icon.ico
+  signAndEditExecutable: false
+  artifactName: ATYLUS-PDV-Setup-${version}.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  runAfterFinish: false             # nem a instalacao silenciosa (/S) nem a normal abrem o app sozinhas
+  shortcutName: ATYLUS PDV Desktop   # nome distinto: nao substitui atalhos "ATYLUS PDV" de instalacoes anteriores
+  deleteAppDataOnUninstall: false   # preserva banco SQLite e chave JWT ao desinstalar
+  installerIcon: assets/icon.ico
+  uninstallerIcon: assets/icon.ico
+  language: "1046"

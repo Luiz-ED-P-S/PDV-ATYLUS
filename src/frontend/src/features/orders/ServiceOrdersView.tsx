@@ -225,7 +225,7 @@ export const ServiceOrdersView: React.FC = () => {
                 <input
                   type="text"
                   required
-                  placeholder="Ex: Mariana Duarte Souza"
+                  placeholder="Ex: Nome do cliente"
                   value={clienteNome}
                   onChange={(e) => setClienteNome(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#005bf8]"
@@ -236,7 +236,7 @@ export const ServiceOrdersView: React.FC = () => {
                 <label className="font-bold text-slate-700 block mb-1">Telefone / WhatsApp</label>
                 <input
                   type="text"
-                  placeholder="(11) 98765-4321"
+                  placeholder="(00) 00000-0000"
                   value={clienteTelefone}
                   onChange={(e) => setClienteTelefone(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#005bf8]"

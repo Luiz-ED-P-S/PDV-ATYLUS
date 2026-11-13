@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { authApi, LoginResposta, setAuthToken, setOnUnauthorized } from '../services/api';
+import { authApi, LoginResposta, setAuthToken, setOnPinTemporario, setOnUnauthorized } from '../services/api';
+import avatarPadraoLocal from '../assets/avatar-padrao.svg';
 
 export type PerfilOperador = 'Operador' | 'Supervisor';
 
@@ -18,8 +19,12 @@ const STORAGE_KEY_SESSAO = 'pdv_atylus_sessao_v2';
 const STORAGE_KEY_PERFIL_VISUAL = 'pdv_atylus_perfil_visual_v1';
 const STORAGE_KEY_AUTH_LEGADO = 'pdv_atylus_auth_v1';
 
-const AVATAR_PADRAO =
-  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&h=120&q=80';
+// Avatar padrão local (embutido no pacote): o PDV funciona offline, sem imagens de URLs externas.
+const AVATAR_PADRAO = avatarPadraoLocal;
+
+// Perfis salvos por versões anteriores podem ter a URL externa antiga; ela é trocada pelo avatar local.
+const normalizarAvatar = (url?: string): string =>
+  !url || /^https?:\/\/images\.unsplash\.com\//i.test(url) ? AVATAR_PADRAO : url;
 
 const operadorDeslogado: OperadorAuth = {
   id: '',
@@ -42,6 +47,7 @@ interface PayloadToken {
   [claim: string]: unknown;
 }
 
+const CLAIM_PIN_TEMPORARIO = 'pin_temporario';
 const CLAIM_ROLE = 'http://schemas.microsoft.com/ws/2008/06/identity/claims/role';
 
 const decodificarToken = (token: string): PayloadToken | null => {
@@ -95,12 +101,15 @@ const montarOperador = (sessao: SessaoSalva, payload: PayloadToken): OperadorAut
     matricula: sessao.operador.matricula,
     nome: visual.nome || sessao.operador.nome,
     email: visual.email,
-    avatarUrl: visual.avatarUrl || AVATAR_PADRAO,
+    avatarUrl: normalizarAvatar(visual.avatarUrl),
     role: perfilDoToken(payload),
   };
 };
 
-const carregarSessao = (): { operador: OperadorAuth; autenticado: boolean; token: string | null } => {
+// A claim assinada do token só serve para a tela aparecer sem esperar a rede; quem decide é a API (403 PIN_TEMPORARIO)
+const pinTemporarioDoToken = (payload: PayloadToken | null): boolean => payload?.[CLAIM_PIN_TEMPORARIO] === 'true';
+
+const carregarSessao = (): { operador: OperadorAuth; autenticado: boolean; token: string | null; usaPinPadrao: boolean } => {
   // A sessão antiga (mock, sem token) não é mais aceita
   remover(STORAGE_KEY_AUTH_LEGADO);
 
@@ -108,12 +117,12 @@ const carregarSessao = (): { operador: OperadorAuth; autenticado: boolean; token
   const payload = sessao ? decodificarToken(sessao.token) : null;
   if (sessao && tokenValido(payload)) {
     setAuthToken(sessao.token);
-    return { operador: montarOperador(sessao, payload), autenticado: true, token: sessao.token };
+    return { operador: montarOperador(sessao, payload), autenticado: true, token: sessao.token, usaPinPadrao: pinTemporarioDoToken(payload) };
   }
 
   remover(STORAGE_KEY_SESSAO);
   setAuthToken(null);
-  return { operador: operadorDeslogado, autenticado: false, token: null };
+  return { operador: operadorDeslogado, autenticado: false, token: null, usaPinPadrao: false };
 };
 
 /** Valida e grava a sessão devolvida pelo backend (login ou troca de PIN). */
@@ -147,7 +156,7 @@ interface AuthState {
   logout: () => void;
   trocarOperador: (matricula: string, pin: string) => Promise<boolean>;
   validarSupervisor: (pin: string) => Promise<boolean>;
-  alterarPin: (pinAtual: string, novoPin: string) => Promise<void>;
+  alterarPin: (pinAtual: string, novoPin: string, confirmacaoNovoPin: string) => Promise<void>;
   atualizarPerfil: (dados: Partial<OperadorAuth>) => void;
   isSupervisor: () => boolean;
 }
@@ -158,7 +167,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   operador: estadoInicial.operador,
   autenticado: estadoInicial.autenticado,
   token: estadoInicial.token,
-  usaPinPadrao: false,
+  usaPinPadrao: estadoInicial.usaPinPadrao,
 
   /**
    * Autentica no backend (matrícula + PIN validados com BCrypt no SQLite local).
@@ -194,9 +203,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  alterarPin: async (pinAtual, novoPin) => {
+  alterarPin: async (pinAtual, novoPin, confirmacaoNovoPin) => {
     // O backend invalida o token anterior e devolve um novo; a sessão deste terminal continua ativa
-    const resposta = await authApi.alterarPin(pinAtual, novoPin);
+    const resposta = await authApi.alterarPin(pinAtual, novoPin, confirmacaoNovoPin);
     const { operador, token } = persistirSessao(resposta);
     set({ operador, autenticado: true, token, usaPinPadrao: false });
   },
@@ -224,3 +233,22 @@ setOnUnauthorized(() => {
     useAuthStore.getState().logout();
   }
 });
+
+// A API recusou algo por PIN temporário: mostra a tela de troca obrigatória (a API continua bloqueando de qualquer forma)
+setOnPinTemporario(() => {
+  if (useAuthStore.getState().autenticado && !useAuthStore.getState().usaPinPadrao) {
+    useAuthStore.setState({ usaPinPadrao: true });
+  }
+});
+
+// Ao reabrir o aplicativo com uma sessão salva, confirma com o backend se o PIN ainda é temporário
+if (estadoInicial.autenticado) {
+  authApi
+    .me()
+    .then(me => {
+      if (useAuthStore.getState().autenticado) useAuthStore.setState({ usaPinPadrao: !!me.usaPinPadrao });
+    })
+    .catch(() => {
+      /* 401 já encerra a sessão; falha de rede mantém o estado do token */
+    });
+}

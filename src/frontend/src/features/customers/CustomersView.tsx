@@ -224,7 +224,7 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ onIniciarVendaClie
                 <input
                   type="text"
                   required
-                  placeholder="Ex: Carlos Silva Sauro"
+                  placeholder="Ex: Nome do cliente"
                   value={nome}
                   onChange={(e) => setNome(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#005bf8]"
@@ -246,7 +246,7 @@ export const CustomersView: React.FC<CustomersViewProps> = ({ onIniciarVendaClie
                   <label className="font-bold text-slate-700 block mb-1">Telefone / WhatsApp</label>
                   <input
                     type="text"
-                    placeholder="(11) 98765-4321"
+                    placeholder="(00) 00000-0000"
                     value={telefone}
                     onChange={(e) => setTelefone(e.target.value)}
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-[#005bf8]"

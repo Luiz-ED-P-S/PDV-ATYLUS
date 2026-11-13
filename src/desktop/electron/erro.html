@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<title>ATYLUS PDV - Não foi possível iniciar</title>
+<style>
+  body{font-family:Segoe UI,Arial,sans-serif;background:#0f172a;color:#e2e8f0;margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh}
+  .card{max-width:640px;margin:24px;padding:32px;background:#1e293b;border-radius:12px;border:1px solid #334155}
+  h1{margin:0 0 8px;font-size:22px;color:#f87171}
+  p{line-height:1.5}
+  .detalhe{background:#0f172a;border-radius:8px;padding:12px;font-family:Consolas,monospace;font-size:12px;white-space:pre-wrap;max-height:160px;overflow:auto;color:#cbd5e1}
+  .acoes{margin-top:20px;display:flex;gap:8px;flex-wrap:wrap}
+  button{background:#2563eb;color:#fff;border:0;border-radius:8px;padding:10px 16px;font-size:14px;cursor:pointer}
+  button.sec{background:#334155}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1 id="titulo">Não foi possível iniciar o ATYLUS PDV</h1>
+  <p id="mensagem"></p>
+  <p><strong>O que fazer:</strong> <span id="acao"></span></p>
+  <div class="detalhe" id="detalhe"></div>
+  <div class="acoes">
+    <button id="tentar">Tentar novamente</button>
+    <button class="sec" id="logs">Abrir pasta de logs</button>
+    <button class="sec" id="sair">Sair</button>
+  </div>
+</div>
+<script>
+  const q = new URLSearchParams(location.search);
+  document.getElementById('titulo').textContent = q.get('titulo') || document.getElementById('titulo').textContent;
+  document.getElementById('mensagem').textContent = q.get('mensagem') || '';
+  document.getElementById('acao').textContent = q.get('acao') || 'Feche e abra o aplicativo novamente. Se persistir, envie o arquivo de log ao suporte.';
+  document.getElementById('detalhe').textContent = q.get('detalhe') || '';
+  document.getElementById('tentar').onclick = () => window.atylus.tentarNovamente();
+  document.getElementById('logs').onclick = () => window.atylus.abrirLogs();
+  document.getElementById('sair').onclick = () => window.atylus.sair();
+</script>
+</body>
+</html>

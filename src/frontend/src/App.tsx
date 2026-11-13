@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Sidebar, ModuloApp } from './components/Sidebar';
 import { Header } from './components/Header';
 import { LoginView } from './features/auth/LoginView';
+import { TrocaPinObrigatoria } from './features/auth/TrocaPinObrigatoria';
 import { useAuthStore } from './store/useAuthStore';
 
 // Módulos do Sistema:
@@ -39,7 +40,7 @@ const AcessoRestrito: React.FC<{ onVoltar: () => void }> = ({ onVoltar }) => (
 );
 
 export const App: React.FC = () => {
-  const { autenticado, operador } = useAuthStore();
+  const { autenticado, operador, usaPinPadrao } = useAuthStore();
   const isSupervisor = operador.role === 'Supervisor';
   const [moduloAtivo, setModuloAtivo] = useState<ModuloApp>('dashboard');
   const [sidebarColapsada, setSidebarColapsada] = useState(false);
@@ -70,6 +71,11 @@ export const App: React.FC = () => {
   // 1. Se não estiver autenticado, exibe a tela de Login exatamente fiel ao vídeo (LoginView)
   if (!autenticado) {
     return <LoginView />;
+  }
+
+  // 1b. PIN temporário (de fábrica/trivial): nada além da troca de PIN fica disponível (a API também bloqueia)
+  if (usaPinPadrao) {
+    return <TrocaPinObrigatoria />;
   }
 
   // 2. Se autenticado, exibe a interface com visual clean, Sidebar branca e Header moderno

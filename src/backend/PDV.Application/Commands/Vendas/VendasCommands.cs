@@ -193,19 +193,22 @@ public class CancelarVendaCommandHandler : IRequestHandler<CancelarVendaCommand,
     private readonly IOperadorRepository _operadorRepository;
     private readonly ICloudSyncService _cloudSyncService;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly PDV.Application.Commands.Auth.OpcoesSeguranca _opcoesSeguranca;
 
     public CancelarVendaCommandHandler(
         IVendaRepository vendaRepository,
         IProdutoRepository produtoRepository,
         IOperadorRepository operadorRepository,
         ICloudSyncService cloudSyncService,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        PDV.Application.Commands.Auth.OpcoesSeguranca opcoesSeguranca)
     {
         _vendaRepository = vendaRepository;
         _produtoRepository = produtoRepository;
         _operadorRepository = operadorRepository;
         _cloudSyncService = cloudSyncService;
         _unitOfWork = unitOfWork;
+        _opcoesSeguranca = opcoesSeguranca;
     }
 
     public async Task<bool> Handle(CancelarVendaCommand request, CancellationToken cancellationToken)
@@ -215,7 +218,9 @@ public class CancelarVendaCommandHandler : IRequestHandler<CancelarVendaCommand,
 
         // Validação com BCrypt contra os supervisores ativos no banco
         var supervisores = await _operadorRepository.ObterSupervisoresAtivosAsync(cancellationToken);
-        var supervisorAutorizado = supervisores.FirstOrDefault(s => s.ValidarPin(request.SupervisorPin));
+        // PIN de fábrica/trivial não autoriza o cancelamento: o supervisor precisa trocá-lo primeiro
+        var pinTemporario = _opcoesSeguranca.ExigirTrocaPinTemporario && PDV.Application.Commands.Auth.PoliticaPin.EhTemporario(request.SupervisorPin);
+        var supervisorAutorizado = pinTemporario ? null : supervisores.FirstOrDefault(s => s.ValidarPin(request.SupervisorPin));
 
         if (supervisorAutorizado == null)
             throw new DomainException("PIN de supervisor inválido ou não autorizado. Apenas supervisores ativos podem cancelar vendas.");

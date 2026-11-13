@@ -14,6 +14,12 @@ using PDV.Infrastructure;
 using PDV.Infrastructure.Context;
 using PDV.Infrastructure.Persistence;
 
+// Versão desktop: o Electron lê a saída do servidor; força UTF-8 para acentos corretos nos logs e mensagens de erro.
+if (Environment.GetEnvironmentVariable("PDV_DESKTOP_MODE") == "1")
+{
+    Console.OutputEncoding = new System.Text.UTF8Encoding(false);
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Configuração das camadas Clean Architecture
@@ -23,6 +29,10 @@ builder.Services.AddApplication();
 builder.Services.AddSingleton(PDV.Application.Commands.Pix.OpcoesPix.Para(
     builder.Environment.EnvironmentName,
     bool.TryParse(builder.Configuration["Pix:PermitirSimulacao"], out var pixSimulacao) && pixSimulacao));
+// Troca obrigatória de PIN temporário: sempre ativa; só pode ser desligada em Development/Testing (testes)
+builder.Services.AddSingleton(PDV.Application.Commands.Auth.OpcoesSeguranca.Para(
+    builder.Environment.EnvironmentName,
+    bool.TryParse(builder.Configuration["Seguranca:ExigirTrocaPinTemporario"], out var exigirTrocaPin) ? exigirTrocaPin : null));
 builder.Services.AddInfrastructure(builder.Configuration);
 
 // Controllers e Swagger
@@ -218,8 +228,7 @@ if (string.IsNullOrWhiteSpace(wwwrootDir) || !Directory.Exists(wwwrootDir))
         Environment.ProcessPath != null ? Path.GetFullPath(Path.Combine(Path.GetDirectoryName(Environment.ProcessPath)!, "../../src/backend/PDV.API/wwwroot")) : null,
         Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../wwwroot")),
         Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"),
-        Path.Combine(Directory.GetCurrentDirectory(), "src/backend/PDV.API/wwwroot"),
-        @"c:\Users\Luiz Ed\OneDrive\Documentos\PDV-ATYLUS\src\backend\PDV.API\wwwroot"
+        Path.Combine(Directory.GetCurrentDirectory(), "src/backend/PDV.API/wwwroot")
     };
 
     wwwrootDir = candidates.FirstOrDefault(p => !string.IsNullOrEmpty(p) && Directory.Exists(p) && File.Exists(Path.Combine(p, "index.html")));
@@ -240,6 +249,7 @@ else
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<PinTemporarioMiddleware>();
 app.MapControllers();
 
 // Endpoint de Healthcheck para verificação de status da API

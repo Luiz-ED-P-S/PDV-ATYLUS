@@ -167,13 +167,13 @@ public class AutenticacaoTests
         using var autenticado = _factory.CriarClienteAutenticado(token);
         using var anonimo = _factory.CreateClient();
 
-        var errado = await autenticado.PostAsJsonAsync("/api/v1/auth/alterar-pin", new { pinAtual = "0000", novoPin = "4321" });
+        var errado = await autenticado.PostAsJsonAsync("/api/v1/auth/alterar-pin", new { pinAtual = "0000", novoPin = "4321", confirmacaoNovoPin = "4321" });
         Assert.Equal(HttpStatusCode.BadRequest, errado.StatusCode);
 
-        var curto = await autenticado.PostAsJsonAsync("/api/v1/auth/alterar-pin", new { pinAtual = PdvApiFactory.PinTeste, novoPin = "12" });
+        var curto = await autenticado.PostAsJsonAsync("/api/v1/auth/alterar-pin", new { pinAtual = PdvApiFactory.PinTeste, novoPin = "12", confirmacaoNovoPin = "12" });
         Assert.Equal(HttpStatusCode.BadRequest, curto.StatusCode);
 
-        var ok = await autenticado.PostAsJsonAsync("/api/v1/auth/alterar-pin", new { pinAtual = PdvApiFactory.PinTeste, novoPin = "8642" });
+        var ok = await autenticado.PostAsJsonAsync("/api/v1/auth/alterar-pin", new { pinAtual = PdvApiFactory.PinTeste, novoPin = "8642", confirmacaoNovoPin = "8642" });
         Assert.Equal(HttpStatusCode.OK, ok.StatusCode);
 
         var loginAntigo = await anonimo.PostAsJsonAsync("/api/v1/auth/login", new { matricula = PdvApiFactory.MatriculaTeste, pin = PdvApiFactory.PinTeste });

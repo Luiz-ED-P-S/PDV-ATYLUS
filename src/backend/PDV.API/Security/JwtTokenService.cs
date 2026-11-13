@@ -20,6 +20,8 @@ public static class Perfis
 public static class PdvClaims
 {
     public const string Matricula = "matricula";
+    /// <summary>"true" quando o operador entrou com PIN temporário (de fábrica/trivial) e precisa trocá-lo.</summary>
+    public const string PinTemporario = "pin_temporario";
 }
 
 public class JwtOptions
@@ -128,6 +130,8 @@ public class JwtTokenService
             new(ClaimTypes.Role, operador.Perfil.ToString()),
             new(JwtOptions.ClaimCarimbo, _options.CalcularCarimbo(operador.EstadoSeguranca))
         };
+        if (operador.UsaPinPadrao)
+            claims.Add(new Claim(PdvClaims.PinTemporario, "true"));
 
         var token = new JwtSecurityToken(
             issuer: JwtOptions.Issuer,
@@ -144,6 +148,9 @@ public class JwtTokenService
 public static class ClaimsPrincipalExtensions
 {
     public static string? ObterMatricula(this ClaimsPrincipal user) => user.FindFirst(PdvClaims.Matricula)?.Value;
+
+    public static bool TemPinTemporario(this ClaimsPrincipal user) =>
+        string.Equals(user.FindFirst(PdvClaims.PinTemporario)?.Value, "true", StringComparison.OrdinalIgnoreCase);
 
     public static Guid? ObterOperadorId(this ClaimsPrincipal user) =>
         Guid.TryParse(user.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var id) ? id : null;

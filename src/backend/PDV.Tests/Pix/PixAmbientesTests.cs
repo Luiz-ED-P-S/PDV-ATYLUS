@@ -29,7 +29,9 @@ public class PixAmbientesTests : IDisposable
     {
         // A fábrica pede Pix:PermitirSimulacao=true; o ambiente Production deve ignorar
         using var factory = new PdvApiFactoryPersonalizada(_pasta, apagarAoDescartar: false, ambiente: "Production");
-        using var api = factory.CriarClienteAutenticado(await factory.ObterTokenAsync("OP01", "0000"));
+        // Em Production a troca dos PINs de fábrica é obrigatória (a configuração de teste que a desliga é ignorada)
+        using var api = factory.CriarClienteAutenticado(await TrocarPinAsync(factory, "OP01", "0000", "7391"));
+        await TrocarPinAsync(factory, "GER01", "1234", "5802");
         (await api.PostAsJsonAsync("/api/v1/caixa/abrir", new { operadorId = "OP01", saldoInicial = 0m })).EnsureSuccessStatusCode();
 
         var recursos = (await api.GetFromJsonAsync<RecursosBody>("/api/v1/sistema/recursos"))!;
@@ -50,9 +52,18 @@ public class PixAmbientesTests : IDisposable
         Assert.Equal("Pendente", (await api.GetFromJsonAsync<CobrancaBody>($"/api/v1/payments/pix/status/{cobranca.TxId}"))!.Status);
 
         var confirmar = await api.PostAsJsonAsync($"/api/v1/payments/pix/{cobranca.TxId}/confirmar-manual",
-            new { supervisorMatricula = "GER01", supervisorPin = "1234" });
+            new { supervisorMatricula = "GER01", supervisorPin = "5802" });
         Assert.Equal(HttpStatusCode.OK, confirmar.StatusCode);
         Assert.True((await confirmar.Content.ReadFromJsonAsync<CobrancaBody>())!.ConfirmacaoManual);
+    }
+
+    private static async Task<string> TrocarPinAsync(PdvApiFactory factory, string matricula, string pinAtual, string novoPin)
+    {
+        var token = await factory.ObterTokenAsync(matricula, pinAtual);
+        using var cliente = factory.CriarClienteAutenticado(token);
+        var resp = await cliente.PostAsJsonAsync("/api/v1/auth/alterar-pin", new { pinAtual, novoPin, confirmacaoNovoPin = novoPin });
+        resp.EnsureSuccessStatusCode();
+        return (await resp.Content.ReadFromJsonAsync<PdvApiFactory.LoginBody>())!.Token;
     }
 
     // ---------- Regras de domínio ----------

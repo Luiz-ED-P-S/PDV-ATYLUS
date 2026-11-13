@@ -106,8 +106,8 @@ export const Header: React.FC<HeaderProps> = ({
   const handleAlterarPin = async (e: React.FormEvent) => {
     e.preventDefault();
     setMensagemPin(null);
-    if (!/^\d{4,}$/.test(novoPinInput)) {
-      setMensagemPin({ tipo: 'erro', texto: 'O novo PIN deve ter no mínimo 4 dígitos numéricos.' });
+    if (!/^\d{4,8}$/.test(novoPinInput)) {
+      setMensagemPin({ tipo: 'erro', texto: 'O novo PIN deve ter de 4 a 8 dígitos numéricos.' });
       return;
     }
     if (novoPinInput !== confirmarPinInput) {
@@ -116,7 +116,7 @@ export const Header: React.FC<HeaderProps> = ({
     }
     setSalvandoPin(true);
     try {
-      await alterarPin(pinAtualInput, novoPinInput);
+      await alterarPin(pinAtualInput, novoPinInput, confirmarPinInput);
       setMensagemPin({ tipo: 'ok', texto: 'PIN alterado com sucesso!' });
       sound.playSuccessChime();
     } catch (err: any) {

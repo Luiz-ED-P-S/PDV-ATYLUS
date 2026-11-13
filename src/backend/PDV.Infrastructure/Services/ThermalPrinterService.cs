@@ -72,7 +72,7 @@ public class ThermalPrinterService : IThermalPrinterService
 
         try
         {
-            var appData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "PDV-ATYLUS", "cloud_sync_config.json");
+            var appData = Path.Combine(PastaDadosApp.Resolver(), "cloud_sync_config.json");
             if (File.Exists(appData))
             {
                 var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(appData));
