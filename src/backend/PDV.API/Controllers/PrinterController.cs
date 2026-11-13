@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Authorization;
+using PDV.API.Security;
 using Microsoft.AspNetCore.Mvc;
 using PDV.Domain.Enums;
 using PDV.Domain.Interfaces;
@@ -6,6 +8,7 @@ namespace PDV.API.Controllers;
 
 [ApiController]
 [Route("api/v1/[controller]")]
+[Authorize]
 public class PrinterController : ControllerBase
 {
     private readonly IThermalPrinterService _printerService;

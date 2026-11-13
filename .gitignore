@@ -29,6 +29,9 @@ dist/
 *.sqlite3
 /backups/
 /src/backend/PDV.API/pdv.db*
+# Trava temporária da atualização do banco (removida ao final) e backups locais de migração
+*.migracao.lock
+backups/
 
 # Sensitive Files & API Keys
 credentials.json
@@ -36,6 +39,8 @@ client_secret*.json
 *.p12
 *.pem
 *.key
+# Chave JWT do PDV, cópias em quarentena (*.corrompida-*) e temporários de gravação
+jwt-signing.key*
 appsettings.Production.json
 appsettings.Local.json
 

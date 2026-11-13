@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Authorization;
+using PDV.API.Security;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using PDV.Application.Commands.Vendas;
@@ -8,6 +10,7 @@ namespace PDV.API.Controllers;
 
 [ApiController]
 [Route("api/v1/[controller]")]
+[Authorize]
 public class VendasController : ControllerBase
 {
     private readonly IMediator _mediator;
@@ -27,7 +30,8 @@ public class VendasController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<VendaDto>> CriarVenda([FromBody] CriarVendaCommand command)
     {
-        var venda = await _mediator.Send(command);
+        // O operador da venda é sempre o do token, nunca o informado pelo cliente
+        var venda = await _mediator.Send(command with { OperadorId = User.ObterMatricula()! });
         return Ok(venda);
     }
 

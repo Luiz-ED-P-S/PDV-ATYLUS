@@ -52,3 +52,18 @@ public enum StatusSincronizacao
     Sincronizado = 2,
     Falha = 3
 }
+
+public enum StatusCobrancaPix
+{
+    Pendente = 1,    // gerada, aguardando confirmação do recebimento
+    Confirmada = 2,  // recebimento confirmado (simulação, supervisor ou provedor), ainda não usada em venda
+    Utilizada = 3,   // vinculada a uma venda; não pode ser usada novamente
+    Expirada = 4
+}
+
+public enum MetodoConfirmacaoPix
+{
+    Simulacao = 1,         // somente Development/Testing explicitamente autorizados
+    ManualSupervisor = 2,  // declaração de recebimento por Supervisor — NÃO é confirmação bancária
+    Provedor = 3           // reservado para integração futura com provedor Pix (PSP)
+}

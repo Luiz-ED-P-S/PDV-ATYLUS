@@ -88,7 +88,6 @@ public class RegistrarMovimentacaoCommandHandler : IRequestHandler<RegistrarMovi
             throw new DomainException("O caixa especificado não existe ou não está aberto.");
 
         caixa.AdicionarMovimentacao(request.Tipo, request.Valor, request.Motivo, request.OperadorId);
-        await _caixaRepository.AtualizarAsync(caixa, cancellationToken);
         await _unitOfWork.CommitAsync(cancellationToken);
 
         var mov = caixa.Movimentacoes.Last();

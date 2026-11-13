@@ -1,36 +1,99 @@
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi.Models;
+using PDV.API.Administracao;
 using PDV.API.BackgroundWorkers;
 using PDV.API.Middlewares;
+using PDV.API.Security;
 using PDV.Application;
 using PDV.Domain.Entities;
 using PDV.Domain.Enums;
 using PDV.Infrastructure;
 using PDV.Infrastructure.Context;
+using PDV.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Configuração das camadas Clean Architecture
 builder.Services.AddApplication();
+
+// Pix: simulação somente com Pix:PermitirSimulacao=true E ambiente Development/Testing (decidido no servidor)
+builder.Services.AddSingleton(PDV.Application.Commands.Pix.OpcoesPix.Para(
+    builder.Environment.EnvironmentName,
+    bool.TryParse(builder.Configuration["Pix:PermitirSimulacao"], out var pixSimulacao) && pixSimulacao));
 builder.Services.AddInfrastructure(builder.Configuration);
 
 // Controllers e Swagger
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+    });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new() { Title = "PDV Atylus API", Version = "v1", Description = "API do Ponto de Venda Offline-First com Clean Architecture e CQRS" });
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Token obtido em POST /api/v1/auth/login"
+    });
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme { Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" } },
+            Array.Empty<string>()
+        }
+    });
+});
+
+// Autenticação local e offline: JWT assinado com chave simétrica guardada em diretório de dados protegido
+builder.Services.AddSingleton(sp => JwtOptions.Carregar(
+    sp.GetRequiredService<IConfiguration>(),
+    sp.GetRequiredService<IHostEnvironment>(),
+    sp.GetRequiredService<ILoggerFactory>().CreateLogger("PDV.Seguranca.ChaveJwt")));
+builder.Services.AddSingleton<JwtTokenService>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<LoginAttemptLimiter>(sp => new LoginAttemptLimiter(sp.GetRequiredService<TimeProvider>()));
+
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.MapInboundClaims = false;
+        // Recusa tokens de operadores desativados ou emitidos antes de troca de PIN/perfil
+        options.Events = new JwtBearerEvents { OnTokenValidated = ValidadorSessaoOperador.ValidarAsync };
+    })
+    .AddScheme<AuthenticationSchemeOptions, SyncApiKeyAuthenticationHandler>(SyncApiKeyAuthenticationHandler.NomeEsquema, null);
+
+builder.Services
+    .AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+    .Configure<JwtOptions>((options, jwt) => options.TokenValidationParameters = jwt.ParametrosValidacao());
+
+builder.Services.AddAuthorization(options =>
+{
+    // Qualquer endpoint sem regra explícita exige usuário autenticado (rede de segurança)
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
 });
 
 // Worker de Backup em segundo plano no Google Drive e Worker de Sincronização em Nuvem (Offline-First)
 builder.Services.AddHostedService<GoogleDriveBackupWorker>();
 builder.Services.AddHostedService<CloudSyncWorker>();
 
-// Habilitar CORS para o frontend (Vite React na porta 5173 ou produção)
+// Habilitar CORS para o frontend (Vite React na porta 5173, 5000 ou produção)
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowLocalhost", policy =>
     {
-        policy.WithOrigins("http://localhost:5173", "http://localhost:3000", "https://localhost:5173")
+        policy.WithOrigins("http://localhost:5173", "http://localhost:3000", "https://localhost:5173", "http://localhost:5000", "https://localhost:5000")
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
@@ -39,11 +102,62 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// Modo de diagnóstico: "PDV.API --verificar-banco" mostra a situação do banco e as migrations pendentes,
+// sem alterar nada (não cria chave, não aplica migrations, não sobe o servidor).
+if (args.Contains("--verificar-banco"))
+{
+    using var escopoDiagnostico = app.Services.CreateScope();
+    Console.OutputEncoding = System.Text.Encoding.UTF8;
+    var diagnostico = escopoDiagnostico.ServiceProvider.GetRequiredService<MigradorBancoDados>().Diagnosticar();
+    Console.WriteLine(diagnostico.Relatorio());
+    Environment.ExitCode = diagnostico.Situacao == SituacaoBanco.Incompativel ? 1 : 0;
+    return;
+}
+
+// Comando administrativo: autoriza explicitamente a atualização de um banco existente (confirmando arquivo e versão).
+// Não carrega a chave JWT nem sobe o servidor.
+if (args.Contains(ComandoAtualizarBanco.Argumento))
+{
+    using var escopoAtualizacao = app.Services.CreateScope();
+    Console.OutputEncoding = System.Text.Encoding.UTF8;
+    Environment.ExitCode = ComandoAtualizarBanco.Executar(
+        args, escopoAtualizacao.ServiceProvider.GetRequiredService<MigradorBancoDados>(), Console.Out);
+    return;
+}
+
+// Carrega a chave de autenticação ANTES de tocar no banco: sem chave confiável a API não inicia (falha segura)
+try
+{
+    app.Services.GetRequiredService<JwtOptions>();
+}
+catch (ChaveJwtException ex)
+{
+    app.Logger.LogCritical("Falha ao carregar a chave de autenticação ({Tipo}): {Mensagem}", ex.Tipo, ex.Message);
+    throw;
+}
+
 // Inicialização automática do banco SQLite e Carga Inicial (Seed)
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<PdvDbContext>();
-    context.Database.EnsureCreated();
+
+    // Banco novo: criado pelas migrations. Banco existente: apenas diagnosticado — se precisar de atualização
+    // (inclusive baseline de bancos criados pelo antigo EnsureCreated), o PDV NÃO inicia e informa o comando
+    // administrativo --atualizar-banco. Nenhuma migração de banco existente acontece na inicialização normal.
+    try
+    {
+        scope.ServiceProvider.GetRequiredService<MigradorBancoDados>().Executar();
+    }
+    catch (MigracaoBancoException ex) when (ex.Etapa == EtapaMigracao.Autorizacao)
+    {
+        app.Logger.LogCritical("ATUALIZAÇÃO DO BANCO NECESSÁRIA: {Mensagem}", ex.Message);
+        throw;
+    }
+    catch (MigracaoBancoException ex)
+    {
+        app.Logger.LogCritical("Falha na preparação do banco de dados ({Etapa}): {Mensagem}", ex.Etapa, ex.Message);
+        throw;
+    }
 
     try
     {
@@ -124,21 +238,26 @@ else
     app.UseStaticFiles();
 }
 
+app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
 // Endpoint de Healthcheck para verificação de status da API
-app.MapGet("/health", () => Results.Ok(new { status = "healthy", version = "1.0.0", timestamp = DateTime.UtcNow }));
+app.MapGet("/health", () => Results.Ok(new { status = "healthy", version = "1.0.0", timestamp = DateTime.UtcNow }))
+   .AllowAnonymous();
 
-// Fallback para SPA React (roteamento no cliente)
+// Fallback para SPA React (roteamento no cliente) — a tela de login precisa carregar sem token
 if (!string.IsNullOrEmpty(wwwrootDir) && Directory.Exists(wwwrootDir) && File.Exists(Path.Combine(wwwrootDir, "index.html")))
 {
     var physicalProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(wwwrootDir);
-    app.MapFallbackToFile("index.html", new StaticFileOptions { FileProvider = physicalProvider });
+    app.MapFallbackToFile("index.html", new StaticFileOptions { FileProvider = physicalProvider }).AllowAnonymous();
 }
 else
 {
-    app.MapFallbackToFile("index.html");
+    app.MapFallbackToFile("index.html").AllowAnonymous();
 }
 
 app.Run();
+
+// Exposto para testes de integração (WebApplicationFactory)
+public partial class Program { }

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Upload, FileSpreadsheet, Sparkles, Check, ArrowRight, FileCode, PackagePlus } from 'lucide-react';
 import { MapeamentoColunas, NfeXmlProdutoItem } from '../../types';
+import { authHeaders } from '../../services/api';
 
 interface ImporterViewProps {
   onVoltarParaPdv: () => void;
@@ -99,7 +100,7 @@ export const ImporterView: React.FC<ImporterViewProps> = ({ onVoltarParaPdv }) =
     try {
       const response = await fetch('/api/v1/importer/analyze', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({
           nomeArquivo: nome,
           cabecalhos: headers,

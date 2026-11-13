@@ -21,6 +21,11 @@ public class ExceptionHandlingMiddleware
         {
             await _next(context);
         }
+        catch (ConflitoException ex)
+        {
+            _logger.LogWarning("Conflito de concorrência/estado: {Message}", ex.Message);
+            await HandleExceptionAsync(context, HttpStatusCode.Conflict, ex.Message);
+        }
         catch (DomainException ex)
         {
             _logger.LogWarning("Violação de regra de negócio: {Message}", ex.Message);

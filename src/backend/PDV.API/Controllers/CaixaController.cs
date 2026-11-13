@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Authorization;
+using PDV.API.Security;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using PDV.Application.Commands.CaixaCommands;
@@ -8,6 +10,7 @@ namespace PDV.API.Controllers;
 
 [ApiController]
 [Route("api/v1/[controller]")]
+[Authorize]
 public class CaixaController : ControllerBase
 {
     private readonly IMediator _mediator;
@@ -27,14 +30,15 @@ public class CaixaController : ControllerBase
     [HttpPost("abrir")]
     public async Task<ActionResult<CaixaDto>> AbrirCaixa([FromBody] AbrirCaixaCommand command)
     {
-        var caixa = await _mediator.Send(command);
+        // O operador responsável é sempre o do token, nunca o informado pelo cliente
+        var caixa = await _mediator.Send(command with { OperadorId = User.ObterMatricula()! });
         return Ok(caixa);
     }
 
     [HttpPost("movimentacao")]
     public async Task<ActionResult<MovimentacaoCaixaDto>> RegistrarMovimentacao([FromBody] RegistrarMovimentacaoCommand command)
     {
-        var movimentacao = await _mediator.Send(command);
+        var movimentacao = await _mediator.Send(command with { OperadorId = User.ObterMatricula()! });
         return Ok(movimentacao);
     }
 

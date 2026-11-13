@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, DollarSign, QrCode, CreditCard, CheckCircle2, Copy, Check, Play, Plus, Trash2, User } from 'lucide-react';
-import { FormaPagamento, PagamentoItem, PixGenerateResult, Venda } from '../../../types';
+import { X, DollarSign, QrCode, CreditCard, CheckCircle2, Copy, Check, Play, Plus, Trash2, User, ShieldCheck } from 'lucide-react';
+import { CobrancaPix, FormaPagamento, PagamentoItem, RecursosSistema, Venda } from '../../../types';
 import { useCartStore } from '../../../store/useCartStore';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { pdvApi } from '../../../services/api';
@@ -31,9 +31,15 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onV
   const [clienteNome, setClienteNome] = useState(abaAtiva.clienteNome || '');
   const [clienteDoc, setClienteDoc] = useState(abaAtiva.clienteDocumento || '');
 
-  // Pix
-  const [pixInfo, setPixInfo] = useState<PixGenerateResult | null>(null);
+  // Pix (cobrança persistida; a confirmação vem sempre do backend)
+  const [pixInfo, setPixInfo] = useState<CobrancaPix | null>(null);
   const [pixCopiado, setPixCopiado] = useState(false);
+  const [pixErro, setPixErro] = useState<string | null>(null);
+  const [recursos, setRecursos] = useState<RecursosSistema | null>(null);
+  const [supMatricula, setSupMatricula] = useState('');
+  const [supPin, setSupPin] = useState('');
+  const [supObs, setSupObs] = useState('');
+  const [confirmandoPix, setConfirmandoPix] = useState(false);
   const [processando, setProcessando] = useState(false);
 
   // Totais calculados
@@ -49,6 +55,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onV
       setDinheiroRecebido(total);
       setPixInfo(null);
       setPixCopiado(false);
+      setPixErro(null);
+      setSupMatricula('');
+      setSupPin('');
+      setSupObs('');
+      pdvApi.obterRecursos().then(setRecursos).catch(() => setRecursos(null));
       setClienteNome(abaAtiva.clienteNome || '');
       setClienteDoc(abaAtiva.clienteDocumento || '');
     }
@@ -62,31 +73,80 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onV
     }
   }, [restante]);
 
-  // Gerar Pix se selecionado
+  // Gerar cobrança Pix (persistida no backend) se selecionado
   useEffect(() => {
-    if (formaSelecionada === 'Pix' && isOpen && !pixInfo && restante > 0) {
-      pdvApi.gerarPix(restante, 'Venda Balcão PDV').then(res => setPixInfo(res));
+    if (formaSelecionada === 'Pix' && isOpen && !pixInfo && !pixErro && restante > 0) {
+      pdvApi
+        .gerarPix(Math.round(restante * 100) / 100, 'Venda Balcão PDV')
+        .then(res => setPixInfo(res))
+        .catch((err: any) => setPixErro(err?.response?.data?.mensagem || 'Não foi possível gerar a cobrança Pix.'));
     }
-  }, [formaSelecionada, isOpen, restante, pixInfo]);
+  }, [formaSelecionada, isOpen, restante, pixInfo, pixErro]);
 
-  // Polling automático de Pix
+  /** O pagamento Pix só é lançado com a cobrança CONFIRMADA pelo backend. */
+  const lancarPixConfirmado = (cobranca: CobrancaPix) => {
+    if (cobranca.status !== 'Confirmada') return;
+    lancarPagamento(
+      'Pix',
+      cobranca.valor,
+      0,
+      cobranca.txId,
+      cobranca.confirmacaoManual ? `Confirmado manualmente por ${cobranca.supervisorMatricula} (não bancário)` : undefined
+    );
+  };
+
+  // Acompanha a cobrança: lança somente quando o backend informar "Confirmada"
   useEffect(() => {
     if (formaSelecionada !== 'Pix' || !pixInfo) return;
 
     const interval = setInterval(async () => {
-      const status = await pdvApi.consultarPix(pixInfo.txId);
-      if (status.pago) {
-        clearInterval(interval);
-        lancarPagamento('Pix', pixInfo.valor, 0, pixInfo.txId);
+      try {
+        const status = await pdvApi.consultarPix(pixInfo.txId);
+        if (status.status === 'Confirmada') {
+          clearInterval(interval);
+          lancarPixConfirmado(status);
+        } else if (status.status === 'Expirada') {
+          clearInterval(interval);
+          setPixErro('A cobrança Pix expirou. Selecione Pix novamente para gerar outra.');
+          setPixInfo(null);
+        }
+      } catch {
+        // falha transitória de rede: tenta de novo no próximo ciclo
       }
     }, 2000);
 
     return () => clearInterval(interval);
   }, [formaSelecionada, pixInfo]);
 
+  const handleSimularPix = async () => {
+    if (!pixInfo) return;
+    try {
+      lancarPixConfirmado(await pdvApi.simularPagamentoPix(pixInfo.txId));
+    } catch (err: any) {
+      setPixErro(err?.response?.data?.mensagem || 'Simulação indisponível.');
+    }
+  };
+
+  const handleConfirmarPixManual = async () => {
+    if (!pixInfo || confirmandoPix) return;
+    setPixErro(null);
+    setConfirmandoPix(true);
+    try {
+      const confirmada = await pdvApi.confirmarPixManual(pixInfo.txId, supMatricula.trim().toUpperCase(), supPin, supObs.trim() || undefined);
+      setSupPin('');
+      lancarPixConfirmado(confirmada);
+    } catch (err: any) {
+      setSupPin('');
+      setPixErro(err?.message || 'Não foi possível confirmar o Pix.');
+      sound.playErrorBeep();
+    } finally {
+      setConfirmandoPix(false);
+    }
+  };
+
   const trocoCalculado = formaSelecionada === 'Dinheiro' ? Math.max(0, dinheiroRecebido - valorParcela) : 0;
 
-  const lancarPagamento = (forma: FormaPagamento, valor: number, troco = 0, txId?: string) => {
+  const lancarPagamento = (forma: FormaPagamento, valor: number, troco = 0, txId?: string, confirmacaoManual?: string) => {
     if (valor <= 0) return;
     const novo: PagamentoItem = {
       id: 'pag-' + Date.now(),
@@ -94,10 +154,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onV
       valor,
       troco,
       txId,
+      confirmacaoManual,
     };
     setPagamentosLancados(prev => [...prev, novo]);
     sound.playScanBeep();
     setPixInfo(null);
+    setPixErro(null);
   };
 
   const removerPagamento = (id: string) => {
@@ -294,35 +356,113 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onV
 
             {formaSelecionada === 'Pix' && (
               <div className="text-center space-y-3">
+                {pixErro && (
+                  <div className="p-2 bg-rose-950/60 border border-rose-800 rounded-lg text-[11px] text-rose-300">{pixErro}</div>
+                )}
                 {pixInfo ? (
                   <>
-                    <div className="inline-block p-2 bg-white rounded-xl shadow-lg">
-                      <img src={pixInfo.qrCodeBase64} alt="QR Code" className="w-32 h-32" />
+                    <div className="text-xs font-mono text-slate-300">
+                      Cobrança <span className="text-white font-bold">{pixInfo.txId}</span> • R$ {pixInfo.valor.toFixed(2)}
+                      <span className="block text-[10px] text-slate-500">Aguardando confirmação do recebimento…</span>
                     </div>
-                    <div className="flex justify-center gap-2">
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(pixInfo.copiaECola);
-                          setPixCopiado(true);
-                          setTimeout(() => setPixCopiado(false), 1500);
-                        }}
-                        className="px-3 py-1.5 bg-slate-800 text-xs text-slate-300 rounded-lg flex items-center gap-1 font-mono"
-                      >
-                        {pixCopiado ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                        <span>{pixCopiado ? 'Copiado!' : 'Copiar Chave'}</span>
-                      </button>
 
+                    {pixInfo.qrCodeBase64 ? (
+                      <>
+                        {pixInfo.simulada && (
+                          <div className="px-2 py-1 bg-amber-950/60 border border-amber-700 rounded text-[10px] text-amber-300 font-bold uppercase">
+                            Simulação — este QR Code não é uma cobrança bancária
+                          </div>
+                        )}
+                        <div className="inline-block p-2 bg-white rounded-xl shadow-lg">
+                          <img src={pixInfo.qrCodeBase64} alt="QR Code" className="w-32 h-32" />
+                        </div>
+                        {pixInfo.copiaECola && (
+                          <div className="flex justify-center">
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(pixInfo.copiaECola || '');
+                                setPixCopiado(true);
+                                setTimeout(() => setPixCopiado(false), 1500);
+                              }}
+                              className="px-3 py-1.5 bg-slate-800 text-xs text-slate-300 rounded-lg flex items-center gap-1 font-mono"
+                            >
+                              {pixCopiado ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                              <span>{pixCopiado ? 'Copiado!' : 'Copiar Chave'}</span>
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="p-2 bg-slate-900 border border-slate-700 rounded-lg text-[11px] text-slate-300 text-left">
+                        {pixInfo.instrucoes}
+                      </div>
+                    )}
+
+                    {/* Simulação: só quando o SERVIDOR habilitar (desenvolvimento/testes); confirmada pelo backend */}
+                    {recursos?.pixSimulacaoHabilitada && pixInfo.simulada && (
                       <button
-                        onClick={() => lancarPagamento('Pix', restante, 0, pixInfo.txId)}
-                        className="px-3 py-1.5 bg-sky-950 hover:bg-sky-900 border border-sky-800 text-xs text-sky-300 rounded-lg flex items-center gap-1 font-mono font-bold"
+                        onClick={handleSimularPix}
+                        className="mx-auto px-3 py-1.5 bg-sky-950 hover:bg-sky-900 border border-sky-800 text-xs text-sky-300 rounded-lg flex items-center gap-1 font-mono font-bold"
                       >
                         <Play className="w-3.5 h-3.5 text-sky-400" />
-                        <span>Simular Confirmação Pix</span>
+                        <span>Simular pagamento (ambiente de testes)</span>
+                      </button>
+                    )}
+
+                    {/* Confirmação manual supervisionada (não bancária) */}
+                    <div className="p-3 bg-slate-900 border border-slate-700 rounded-xl space-y-2 text-left">
+                      <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-200">
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                        Confirmação manual do recebimento (Supervisor)
+                      </div>
+                      <p className="text-[10px] text-slate-500">
+                        Use somente após conferir o crédito no aplicativo do banco. Fica registrado como confirmação manual, não bancária.
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          placeholder="Matrícula do Supervisor"
+                          value={supMatricula}
+                          onChange={e => setSupMatricula(e.target.value.toUpperCase())}
+                          className="px-2 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white font-mono"
+                        />
+                        <input
+                          type="password"
+                          inputMode="numeric"
+                          autoComplete="off"
+                          placeholder="PIN do Supervisor"
+                          value={supPin}
+                          onChange={e => setSupPin(e.target.value)}
+                          className="px-2 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white font-mono"
+                        />
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Observação (opcional)"
+                        maxLength={300}
+                        value={supObs}
+                        onChange={e => setSupObs(e.target.value)}
+                        className="w-full px-2 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white"
+                      />
+                      <button
+                        onClick={handleConfirmarPixManual}
+                        disabled={confirmandoPix || !supMatricula.trim() || !supPin}
+                        className="w-full py-1.5 bg-emerald-800 hover:bg-emerald-700 disabled:opacity-50 text-xs text-white font-bold rounded-lg"
+                      >
+                        {confirmandoPix ? 'Validando…' : 'Confirmar recebimento'}
                       </button>
                     </div>
                   </>
                 ) : (
-                  <div className="text-xs text-slate-400 font-mono">Gerando QR Code Pix...</div>
+                  !pixErro && <div className="text-xs text-slate-400 font-mono">Gerando cobrança Pix...</div>
+                )}
+                {!pixInfo && pixErro && (
+                  <button
+                    onClick={() => setPixErro(null)}
+                    className="px-3 py-1.5 bg-slate-800 text-xs text-slate-300 rounded-lg font-mono"
+                  >
+                    Gerar nova cobrança
+                  </button>
                 )}
               </div>
             )}
@@ -370,6 +510,9 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, onV
                     <div key={p.id} className="p-3 bg-slate-900 border border-slate-800 rounded-xl flex justify-between items-center text-xs font-mono">
                       <div>
                         <span className="font-bold text-white block">{p.forma}</span>
+                        {p.confirmacaoManual && (
+                          <span className="text-[10px] text-amber-300 block">{p.confirmacaoManual}</span>
+                        )}
                         {p.troco && p.troco > 0 ? (
                           <span className="text-[10px] text-amber-400">Troco: R$ {p.troco.toFixed(2)}</span>
                         ) : null}

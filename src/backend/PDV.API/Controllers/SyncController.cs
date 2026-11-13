@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Authorization;
+using PDV.API.Security;
 using Microsoft.AspNetCore.Mvc;
 using PDV.Domain.Interfaces;
 
@@ -5,6 +7,7 @@ namespace PDV.API.Controllers;
 
 [ApiController]
 [Route("api/v1/[controller]")]
+[Authorize]
 public class SyncController : ControllerBase
 {
     private readonly ICloudSyncService _cloudSyncService;
@@ -31,6 +34,7 @@ public class SyncController : ControllerBase
     }
 
     [HttpPost("testar-conexao")]
+    [Authorize(Roles = Perfis.Supervisor)]
     public async Task<ActionResult<bool>> TestarConexao(CancellationToken cancellationToken)
     {
         var online = await _cloudSyncService.TestarConexaoNuvemAsync(cancellationToken);
@@ -38,6 +42,7 @@ public class SyncController : ControllerBase
     }
 
     [HttpPost("config")]
+    [Authorize(Roles = Perfis.Supervisor)]
     public IActionResult AtualizarConfiguracao([FromBody] AtualizarConfigSyncRequest request)
     {
         _cloudSyncService.AtualizarConfiguracao(
@@ -52,6 +57,7 @@ public class SyncController : ControllerBase
     }
 
     [HttpPost("puxar-catalogo")]
+    [Authorize(Roles = Perfis.Supervisor)]
     public async Task<ActionResult<ResultadoSincronizacao>> PuxarCatalogoNuvem(CancellationToken cancellationToken)
     {
         var resultado = await _cloudSyncService.BaixarCatalogoNuvemAsync(cancellationToken);
@@ -59,6 +65,7 @@ public class SyncController : ControllerBase
     }
 
     [HttpPost("heartbeat")]
+    [Authorize(AuthenticationSchemes = "Bearer," + SyncApiKeyAuthenticationHandler.NomeEsquema)]
     public IActionResult ReceberHeartbeat([FromBody] HeartbeatPayloadRequest payload)
     {
         _logger.LogInformation("Heartbeat recebido do terminal {Terminal} (Versão {Versao}) com {Pendentes} pendentes.", payload.TerminalId, payload.Versao, payload.Pendentes);
@@ -66,6 +73,7 @@ public class SyncController : ControllerBase
     }
 
     [HttpPost("receber-lote")]
+    [Authorize(AuthenticationSchemes = "Bearer," + SyncApiKeyAuthenticationHandler.NomeEsquema)]
     public IActionResult ReceberLote([FromBody] List<LoteSincronizacaoItemRequest> itens)
     {
         _logger.LogInformation("Recebido lote de sincronização multi-terminal com {Total} registros.", itens.Count);

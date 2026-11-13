@@ -197,3 +197,14 @@ public class SincronizacaoRepository : Repository<RegistroSincronizacao>, ISincr
         return antigos.Count;
     }
 }
+
+public class CobrancaPixRepository : Repository<CobrancaPix>, ICobrancaPixRepository
+{
+    public CobrancaPixRepository(PdvDbContext context) : base(context) { }
+
+    public async Task<CobrancaPix?> ObterPorTxIdAsync(string txId, CancellationToken cancellationToken = default)
+    {
+        var id = (txId ?? string.Empty).Trim();
+        return await _dbSet.FirstOrDefaultAsync(c => c.TxId == id, cancellationToken);
+    }
+}

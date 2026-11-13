@@ -17,8 +17,30 @@ import { ImporterView } from './features/importer/ImporterView';
 import { SettingsView } from './features/settings/SettingsView';
 import { CashierModal } from './features/cashier/CashierModal';
 
+// Módulos administrativos: a API também exige perfil Supervisor nas operações correspondentes
+const MODULOS_SOMENTE_SUPERVISOR: ModuloApp[] = ['importer', 'settings'];
+
+const AcessoRestrito: React.FC<{ onVoltar: () => void }> = ({ onVoltar }) => (
+  <div className="h-full flex items-center justify-center p-6">
+    <div className="max-w-sm w-full bg-white border border-slate-200 rounded-3xl shadow-sm p-6 text-center">
+      <h2 className="text-base font-bold text-slate-900">Acesso restrito</h2>
+      <p className="text-sm text-slate-500 mt-2">
+        Este módulo é exclusivo para Supervisores. Use "Trocar Operador" com uma matrícula de Supervisor para continuar.
+      </p>
+      <button
+        type="button"
+        onClick={onVoltar}
+        className="mt-5 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold rounded-xl"
+      >
+        Voltar ao Painel
+      </button>
+    </div>
+  </div>
+);
+
 export const App: React.FC = () => {
-  const { autenticado } = useAuthStore();
+  const { autenticado, operador } = useAuthStore();
+  const isSupervisor = operador.role === 'Supervisor';
   const [moduloAtivo, setModuloAtivo] = useState<ModuloApp>('dashboard');
   const [sidebarColapsada, setSidebarColapsada] = useState(false);
   const [sidebarMobileAberta, setSidebarMobileAberta] = useState(false);
@@ -119,11 +141,15 @@ export const App: React.FC = () => {
 
           {moduloAtivo === 'products' && <ProductsView />}
 
-          {moduloAtivo === 'importer' && (
+          {MODULOS_SOMENTE_SUPERVISOR.includes(moduloAtivo) && !isSupervisor && (
+            <AcessoRestrito onVoltar={() => setModuloAtivo('dashboard')} />
+          )}
+
+          {moduloAtivo === 'importer' && isSupervisor && (
             <ImporterView onVoltarParaPdv={() => setModuloAtivo('pos')} />
           )}
 
-          {moduloAtivo === 'settings' && <SettingsView />}
+          {moduloAtivo === 'settings' && isSupervisor && <SettingsView />}
         </main>
       </div>
 

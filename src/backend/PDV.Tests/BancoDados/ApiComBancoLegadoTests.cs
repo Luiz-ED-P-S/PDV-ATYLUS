@@ -1,0 +1,110 @@
+using System.Net;
+using System.Net.Http.Json;
+using Microsoft.Data.Sqlite;
+using PDV.Tests.Infra;
+using static PDV.Tests.BancoDados.BancosDeTeste;
+
+namespace PDV.Tests.BancoDados;
+
+/// <summary>
+/// API real sobre bancos TEMPORÁRIOS: um banco G1 (criado até 03/11 por EnsureCreated) impede a operação
+/// do PDV até ser atualizado com autorização explícita; depois disso a inicialização normal funciona.
+/// </summary>
+public class ApiComBancoLegadoTests : IDisposable
+{
+    private readonly string _pasta = Path.Combine(Path.GetTempPath(), "pdv-api-legado-" + Guid.NewGuid().ToString("N"));
+
+    [Fact]
+    public async Task BancoG1_BloqueiaOPdvAteAutorizacao_EDepoisContinuaCompativel()
+    {
+        var caminho = CriarLegado(_pasta, "G1");
+        var hash = Hash(caminho);
+
+        // 1) Inicialização normal: o PDV não opera e o banco não é alterado
+        using (var bloqueada = new PdvApiFactoryPersonalizada(_pasta, apagarAoDescartar: false))
+        {
+            var erro = Record.Exception(() => bloqueada.CreateClient());
+            Assert.NotNull(erro);
+            Assert.Contains("precisa ser ATUALIZADO", TodasAsMensagens(erro!));
+        }
+        SqliteConnection.ClearAllPools();
+        Assert.Equal(hash, Hash(caminho));
+        Assert.Empty(Historico(caminho));
+        Assert.Empty(BancosDeTeste.Backups(_pasta));
+
+        // 2) Atualização autorizada pelo administrador (equivale a --atualizar-banco ... --confirmar)
+        Assert.True(MigrarAutorizado(caminho).HouveAlteracao);
+
+        // 3) Inicialização normal volta a funcionar com os dados antigos
+        using var factory = new PdvApiFactoryPersonalizada(_pasta, apagarAoDescartar: false);
+        var token = await factory.ObterTokenAsync("OP01", "0000");           // operador e PIN (hash) antigos
+        using var api = factory.CriarClienteAutenticado(token);
+
+        // Vendas antigas legíveis (antes da migração, o EF falhava por falta de TerminalId/NumeroSequencial)
+        var vendas = (await api.GetFromJsonAsync<List<VendaBody>>("/api/v1/vendas"))!;
+        Assert.Contains(vendas, v => v.Id == Guid.Parse(Venda1) && v.Status == "Concluida" && v.ValorLiquido == 51.80m);
+        Assert.Contains(vendas, v => v.Id == Guid.Parse(Venda2) && v.Status == "Cancelada");
+
+        // Caixa aberto antigo com suas movimentações, e uma nova venda registrada nele
+        var caixa = (await api.GetFromJsonAsync<CaixaBody>("/api/v1/caixa/atual"))!;
+        Assert.Equal(Guid.Parse(Caixa1), caixa.Id);
+        Assert.Equal(2, caixa.Movimentacoes.Count);
+
+        var nova = await api.PostAsJsonAsync("/api/v1/vendas", new
+        {
+            operadorId = "OP01",
+            desconto = 0m,
+            itens = new[] { new { produtoId = Guid.Parse(Produto1), quantidade = 1m, precoUnitario = 25.90m } },
+            pagamentos = new[] { new { formaPagamento = "Dinheiro", valor = 30m, troco = 4.10m } }
+        });
+        Assert.Equal(HttpStatusCode.OK, nova.StatusCode);
+
+        // Sincronização (tabela criada pela migration) funcionando
+        Assert.Equal(HttpStatusCode.OK, (await api.GetAsync("/api/v1/sync/status")).StatusCode);
+
+        factory.Dispose();
+        SqliteConnection.ClearAllPools();
+        Assert.Equal(TodasMigracoes.Count, Historico(caminho).Count);
+        Assert.Single(BancosDeTeste.Backups(_pasta));
+    }
+
+    [Fact]
+    public void BancoIncompativel_ImpedeOperacao_SemModificarDados()
+    {
+        var caminho = CriarLegado(_pasta, "G1", ajuste: c => Sql(c, "ALTER TABLE \"Produtos\" DROP COLUMN \"EstoqueMinimo\";"));
+        var hash = Hash(caminho);
+
+        using (var factory = new PdvApiFactoryPersonalizada(_pasta, apagarAoDescartar: false))
+        {
+            var erro = Record.Exception(() => factory.CreateClient());
+            Assert.NotNull(erro);
+            Assert.Contains("Coluna ausente: Produtos.EstoqueMinimo", TodasAsMensagens(erro!));
+        }
+
+        SqliteConnection.ClearAllPools();
+        Assert.Equal(hash, Hash(caminho));
+        Assert.Empty(BancosDeTeste.Backups(_pasta));
+    }
+
+    private static string TodasAsMensagens(Exception ex)
+    {
+        var mensagens = new List<string>();
+        for (var atual = ex; atual != null; atual = atual.InnerException)
+        {
+            mensagens.Add(atual.Message);
+            if (atual is AggregateException agregada)
+                mensagens.AddRange(agregada.InnerExceptions.Select(TodasAsMensagens));
+        }
+        return string.Join(" | ", mensagens);
+    }
+
+    private record VendaBody(Guid Id, decimal ValorLiquido, string Status);
+    private record MovimentacaoBody(Guid Id);
+    private record CaixaBody(Guid Id, List<MovimentacaoBody> Movimentacoes);
+
+    public void Dispose()
+    {
+        SqliteConnection.ClearAllPools();
+        try { if (Directory.Exists(_pasta)) Directory.Delete(_pasta, recursive: true); } catch { /* temporário */ }
+    }
+}

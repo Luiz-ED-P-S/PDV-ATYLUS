@@ -1,10 +1,105 @@
 import axios from 'axios';
-import { Caixa, MovimentacaoCaixa, PixGenerateResult, Produto, ResultadoSincronizacao, StatusSincronizacao, Venda } from '../types';
+import { Caixa, CobrancaPix, MovimentacaoCaixa, Produto, RecursosSistema, ResultadoSincronizacao, StatusSincronizacao, Venda } from '../types';
 
 const api = axios.create({
   baseURL: '/api/v1',
   timeout: 5000,
 });
+
+// ===== Autenticação (JWT emitido pelo backend local) =====
+let tokenAtual: string | null = null;
+let aoPerderAutorizacao: (() => void) | null = null;
+
+/** Define o token enviado em todas as requisições (null remove). */
+export const setAuthToken = (token: string | null) => {
+  tokenAtual = token;
+};
+
+/** Cabeçalho Authorization para chamadas feitas com fetch() fora do cliente axios. */
+export const authHeaders = (): Record<string, string> =>
+  tokenAtual ? { Authorization: `Bearer ${tokenAtual}` } : {};
+
+/** Callback chamado quando a API responde 401 (token ausente, expirado ou inválido). */
+export const setOnUnauthorized = (callback: () => void) => {
+  aoPerderAutorizacao = callback;
+};
+
+const ROTAS_AUTH_SEM_LOGOUT = ['/auth/login', '/auth/autorizar-supervisor', '/auth/alterar-pin'];
+
+api.interceptors.request.use(config => {
+  if (tokenAtual) {
+    config.headers = config.headers ?? {};
+    config.headers.Authorization = `Bearer ${tokenAtual}`;
+  }
+  return config;
+});
+
+api.interceptors.response.use(
+  resposta => resposta,
+  erro => {
+    const status = erro.response?.status;
+    const url: string = erro.config?.url ?? '';
+    const rotaDeAuth = ROTAS_AUTH_SEM_LOGOUT.some(rota => url.startsWith(rota));
+
+    if (status === 401 && !rotaDeAuth) {
+      aoPerderAutorizacao?.();
+    } else if (status === 403) {
+      const mensagem = 'Ação permitida apenas para Supervisor.';
+      erro.message = mensagem;
+      if (erro.response) {
+        erro.response.data = { ...(erro.response.data || {}), message: mensagem, mensagem };
+      }
+    }
+    return Promise.reject(erro);
+  }
+);
+
+export interface OperadorLoginResposta {
+  id: string;
+  nome: string;
+  matricula: string;
+  perfil: 'Operador' | 'Supervisor';
+  usaPinPadrao: boolean;
+}
+
+export interface LoginResposta {
+  token: string;
+  expiraEm: string;
+  operador: OperadorLoginResposta;
+}
+
+const mensagemDeErro = (err: any, padrao: string): string =>
+  err?.response?.data?.mensagem || err?.response?.data?.message || padrao;
+
+export const authApi = {
+  async login(matricula: string, pin: string): Promise<LoginResposta> {
+    try {
+      const res = await api.post<LoginResposta>('/auth/login', { matricula, pin });
+      return res.data;
+    } catch (err: any) {
+      if (!err.response) throw new Error('Servidor do PDV indisponível. Verifique se o sistema está em execução.');
+      throw new Error(mensagemDeErro(err, 'Matrícula ou PIN inválidos.'));
+    }
+  },
+
+  async autorizarSupervisor(pin: string): Promise<void> {
+    try {
+      await api.post('/auth/autorizar-supervisor', { pin });
+    } catch (err: any) {
+      throw new Error(mensagemDeErro(err, 'PIN de supervisor inválido.'));
+    }
+  },
+
+  /** Troca o PIN; o backend invalida os tokens anteriores e devolve um novo para esta sessão. */
+  async alterarPin(pinAtual: string, novoPin: string): Promise<LoginResposta> {
+    try {
+      const res = await api.post<LoginResposta>('/auth/alterar-pin', { pinAtual, novoPin });
+      return res.data;
+    } catch (err: any) {
+      throw new Error(mensagemDeErro(err, 'Não foi possível alterar o PIN.'));
+    }
+  },
+};
 
 export const pdvApi = {
   async buscarProdutos(termo?: string): Promise<Produto[]> {
@@ -56,8 +151,17 @@ export const pdvApi = {
 
   async obterCaixaAtual(): Promise<Caixa | null> {
     try {
-      const res = await api.get<Caixa>('/caixa/atual');
-      return res.data;
+      const res = await api.get<any>('/caixa/atual');
+      if (!res.data) return null;
+      const c = res.data;
+      return {
+        ...c,
+        status: (c.status === 1 || c.status === 'Aberto') ? 'Aberto' : 'Fechado',
+        movimentacoes: (c.movimentacoes || []).map((m: any) => ({
+          ...m,
+          tipo: (m.tipo === 1 || m.tipo === 'Suprimento') ? 'Suprimento' : 'Sangria',
+        })),
+      };
     } catch (err: any) {
       if (err.response?.status === 404) return null;
       throw err;
@@ -65,8 +169,16 @@ export const pdvApi = {
   },
 
   async abrirCaixa(operadorId: string, saldoInicial: number): Promise<Caixa> {
-    const res = await api.post<Caixa>('/caixa/abrir', { operadorId, saldoInicial });
-    return res.data;
+    const res = await api.post<any>('/caixa/abrir', { operadorId, saldoInicial });
+    const c = res.data;
+    return {
+      ...c,
+      status: (c.status === 1 || c.status === 'Aberto') ? 'Aberto' : 'Fechado',
+      movimentacoes: (c.movimentacoes || []).map((m: any) => ({
+        ...m,
+        tipo: (m.tipo === 1 || m.tipo === 'Suprimento') ? 'Suprimento' : 'Sangria',
+      })),
+    };
   },
 
   async registrarMovimentacao(caixaId: string, tipo: 'Suprimento' | 'Sangria', valor: number, motivo: string, operadorId: string): Promise<MovimentacaoCaixa> {
@@ -131,18 +243,37 @@ export const pdvApi = {
     await api.post('/sync/config', config);
   },
 
-  async gerarPix(valor: number, descricao: string): Promise<PixGenerateResult> {
-    const res = await api.post<PixGenerateResult>('/payments/pix/generate', { valor, descricao });
+  /** Recursos habilitados no servidor (ex.: simulação de Pix). Somente leitura. */
+  async obterRecursos(): Promise<RecursosSistema> {
+    const res = await api.get<RecursosSistema>('/sistema/recursos');
     return res.data;
   },
 
-  async consultarPix(txid: string): Promise<{ txId: string; pago: boolean; valor: number }> {
-    const res = await api.get(`/payments/pix/status/${txid}`);
+  /** Gera uma cobrança Pix persistida no backend. */
+  async gerarPix(valor: number, descricao: string): Promise<CobrancaPix> {
+    const res = await api.post<CobrancaPix>('/payments/pix/generate', { valor, descricao });
     return res.data;
   },
 
-  async simularPagamentoPix(txid: string): Promise<void> {
-    await api.post(`/payments/pix/simulate-payment/${txid}`);
+  async consultarPix(txid: string): Promise<CobrancaPix> {
+    const res = await api.get<CobrancaPix>(`/payments/pix/status/${txid}`);
+    return res.data;
+  },
+
+  /** Somente quando o servidor habilitar a simulação (desenvolvimento/testes). */
+  async simularPagamentoPix(txid: string): Promise<CobrancaPix> {
+    const res = await api.post<CobrancaPix>(`/payments/pix/simulate-payment/${txid}`);
+    return res.data;
+  },
+
+  /** Confirmação manual do recebimento por Supervisor (validada no backend; não é confirmação bancária). */
+  async confirmarPixManual(txid: string, supervisorMatricula: string, supervisorPin: string, observacao?: string): Promise<CobrancaPix> {
+    try {
+      const res = await api.post<CobrancaPix>(`/payments/pix/${txid}/confirmar-manual`, { supervisorMatricula, supervisorPin, observacao });
+      return res.data;
+    } catch (err: any) {
+      throw new Error(err?.response?.data?.mensagem || err?.response?.data?.message || 'Não foi possível confirmar o Pix.');
+    }
   },
 
   // Periféricos: Impressão Térmica ESC/POS & Gaveta

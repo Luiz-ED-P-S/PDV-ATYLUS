@@ -79,15 +79,29 @@ public interface ICloudSyncService
     void AtualizarConfiguracao(string? cloudUrl, string? terminalId, string? apiKey, string? empresaNome = null, string? empresaCnpj = null, string? empresaIe = null, string? empresaEndereco = null);
 }
 
-public interface IPixService
+public interface ICobrancaPixRepository : IRepository<CobrancaPix>
 {
-    Task<PixResult> GerarQrCodeAsync(decimal valor, string descricao, CancellationToken cancellationToken = default);
-    Task<PixStatusResult> ConsultarStatusAsync(string txId, CancellationToken cancellationToken = default);
-    Task SimularPagamentoAsync(string txId, CancellationToken cancellationToken = default);
+    Task<CobrancaPix?> ObterPorTxIdAsync(string txId, CancellationToken cancellationToken = default);
 }
 
-public record PixResult(string TxId, string QrCodeBase64, string CopiaECola, decimal Valor, DateTime ExpiraEm);
-public record PixStatusResult(string TxId, bool Pago, DateTime? DataPagamento, decimal Valor);
+/// <summary>
+/// Provedor que gera os dados de pagamento de uma cobrança Pix. Implementações atuais: simulador (somente
+/// Development/Testing) e manual (sem QR Code; recebimento conferido e confirmado por Supervisor).
+/// Uma integração futura com PSP implementa esta interface e confirma pelo método Provedor.
+/// </summary>
+public interface IPixProvedor
+{
+    string Nome { get; }
+
+    /// <summary>true somente quando o QR Code/copia-e-cola é uma cobrança bancária válida (PSP real).</summary>
+    bool CobrancaBancaria { get; }
+
+    Task<DadosPagamentoPix> PrepararAsync(string txId, decimal valor, string descricao, CancellationToken cancellationToken = default);
+}
+
+/// <param name="QrCodeBase64">Imagem do QR Code, quando o provedor gera uma (nulo no modo manual).</param>
+/// <param name="Instrucoes">Texto para o operador explicando como o pagamento deve ser recebido/confirmado.</param>
+public record DadosPagamentoPix(string? QrCodeBase64, string? CopiaECola, string Instrucoes);
 
 public interface IGoogleDriveBackupService
 {

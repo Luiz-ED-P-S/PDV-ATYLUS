@@ -1,3 +1,6 @@
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using PDV.Domain.Exceptions;
 using Microsoft.EntityFrameworkCore.Storage;
 using PDV.Domain.Interfaces;
 using PDV.Infrastructure.Context;
@@ -16,7 +19,27 @@ public class UnitOfWork : IUnitOfWork, IDisposable, IAsyncDisposable
 
     public async Task<int> CommitAsync(CancellationToken cancellationToken = default)
     {
-        return await _context.SaveChangesAsync(cancellationToken);
+        return await SalvarAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Conflitos de concorrência (registro alterado por outra operação, ex.: cobrança Pix já confirmada/utilizada)
+    /// e disputa de escrita no SQLite viram <see cref="ConflitoException"/> (HTTP 409) em vez de erro interno.
+    /// </summary>
+    private async Task<int> SalvarAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            throw new ConflitoException("O registro foi alterado por outra operação ao mesmo tempo. Nenhuma alteração foi gravada; atualize e tente novamente.", ex);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is SqliteException { SqliteErrorCode: 5 or 6 })
+        {
+            throw new ConflitoException("O banco está ocupado por outra operação simultânea. Nenhuma alteração foi gravada; tente novamente.", ex);
+        }
     }
 
     public async Task BeginTransactionAsync(CancellationToken cancellationToken = default)
@@ -31,7 +54,7 @@ public class UnitOfWork : IUnitOfWork, IDisposable, IAsyncDisposable
     {
         try
         {
-            await _context.SaveChangesAsync(cancellationToken);
+            await SalvarAsync(cancellationToken);
             if (_currentTransaction != null)
             {
                 await _currentTransaction.CommitAsync(cancellationToken);

@@ -3,6 +3,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using PDV.Domain.Interfaces;
 using PDV.Infrastructure.Context;
+using PDV.Infrastructure.Persistence;
+using PDV.Infrastructure.Services.Pix;
+using PDV.Application.Commands.Pix;
 using PDV.Infrastructure.Repositories;
 using PDV.Infrastructure.Services;
 
@@ -50,8 +53,20 @@ public static class DependencyInjection
         services.AddScoped<IOperadorRepository, OperadorRepository>();
         services.AddScoped<ISincronizacaoRepository, SincronizacaoRepository>();
 
+        // Criação/atualização segura do banco por migrations (substitui EnsureCreated)
+        // Atualização automática de bancos existentes: reservada para versões futuras, DESATIVADA por padrão.
+        // Sem ela, bancos existentes só são alterados pelo comando administrativo --atualizar-banco.
+        services.AddSingleton(new OpcoesMigracaoBanco
+        {
+            AtualizacaoAutomatica = bool.TryParse(configuration["Banco:AtualizacaoAutomatica"], out var automatica) && automatica
+        });
+        services.AddScoped<MigradorBancoDados>();
+
         // Serviços Externos e de Suporte
-        services.AddSingleton<IPixService, PixSimulatorService>();
+        // Pix: simulador só quando OpcoesPix (definida pela API a partir do ambiente) permitir; senão confirmação manual.
+        services.AddScoped<ICobrancaPixRepository, CobrancaPixRepository>();
+        services.AddSingleton<IPixProvedor>(sp =>
+            (sp.GetService<OpcoesPix>()?.PermitirSimulacao ?? false) ? new PixSimuladoProvedor() : new PixManualProvedor());
         services.AddScoped<IGoogleDriveBackupService, GoogleDriveBackupService>();
         services.AddScoped<IThermalPrinterService, ThermalPrinterService>();
         services.AddHttpClient<ISpreadsheetAiService, SpreadsheetAiService>();
